@@ -3,5 +3,6 @@
 *.hi
 \#*
 .#*
-test
+*.swp
+parse-test
 geda-sexpress
