@@ -57,7 +57,7 @@ pIntP = do
   n1 <- pInt
   char ','
   n2 <- pInt
-  return $ (n1,n2)
+  return (n1,n2)
 
 {--- Parse three pairs of integer (with leading whitespace) ---}
 pInt3P :: Parser ((Int,Int),(Int,Int),(Int,Int))
@@ -65,7 +65,7 @@ pInt3P = do
   (n1,n2) <- pIntP
   (n3,n4) <- pIntP
   (n5,n6) <- pIntP
-  return $ ((n1,n2),(n3,n4),(n5,n6))
+  return ((n1,n2),(n3,n4),(n5,n6))
 
 {--- Parse attributes ---}
 -- Parse a block of attributes to a list
@@ -108,26 +108,25 @@ pv = do
   version <- pInt
   fileformat_version <- if (version >= 20031004) then pInt else return (-1)
   newline
-  return $ Version version fileformat_version
+  return Version {..}
 
 {--- Parse a Line ---}
 pL :: Parser GSchem
 pL = do 
   char 'L'
   spaces
-  x1:y1:x2:y2:color:width:capstyle:dashstyle:dashlength:dashspace:
+  x1:y1:x2:y2:color:line_width:capstyle:dashstyle:dashlength:dashspace:
     [] <- replicateM 10 pInt
   newline
   atts <- try pAtts <|> return []
-  return $ 
-    L x1 y1 x2 y2 color width capstyle dashstyle dashlength dashspace atts 
+  return $ L {..}
 
 {--- Parse a Graphic ---}
 pG :: Parser GSchem
 pG = do 
   char 'G'
   spaces
-  x1:y1:width:height:angle:ratio:mirrored:embedded:[] <- replicateM 11 pInt
+  x1:y1:box_width:box_height:angle:ratio:mirrored:embedded:[] <- replicateM 11 pInt
   newline
   filename <- many (noneOf "\n")
   newline
@@ -137,10 +136,7 @@ pG = do
               return enc' }
     else return ""
   atts <- try pAtts <|> return [] 
-  return $ 
-    G x1 y1 width height angle ratio mirrored embedded filename 
-      enc_data atts
-
+  return G {..}
 
 {--- Parse a Box ---}
 pB :: Parser GSchem
@@ -152,51 +148,43 @@ pB = do
     [] <- replicateM 16 pInt
   newline
   atts <- try pAtts <|> return [] 
-  return $ 
-    B x1 y1 box_width box_height color line_width capstyle dashstyle dashlength 
-      dashspace filltype fillwidth angle1 pitch1 angle2 pitch2 atts
+  return B {..}
 
 {--- Parse a Circle ---}
 pV :: Parser GSchem
 pV = do 
   char 'V'
   spaces
-  x:y:radius:color:line_width:capstyle:dashtype:dashlength:dashspace:
+  x1:y1:radius:color:line_width:capstyle:dashstyle:dashlength:dashspace:
     filltype:fillwidth:angle1:pitch1:angle2:pitch2:[] <- replicateM 15 pInt
   newline
   atts <- try pAtts <|> return [] 
-  return $ 
-    V x y radius color line_width capstyle dashtype dashlength dashspace 
-      filltype fillwidth angle1 pitch1 angle2 pitch2 atts
+  return $ V {..}
 
 {--- Parse an Arc ---}
 pA :: Parser GSchem
 pA = do
   char 'A'
   spaces
-  x:y:radius:startangle:sweepangle:color:line_width:capstyle:dashstyle:
+  x1:y1:radius:startangle:sweepangle:color:line_width:capstyle:dashstyle:
     dashlength:dashspace:[] <- replicateM 11 pInt
   newline
   atts <- try pAtts <|> return [] 
-  return $ 
-    A x y radius startangle sweepangle color line_width capstyle dashstyle 
-      dashlength dashspace atts
+  return A {..}
 
 {--- Parse a Text Object ---}
 pT :: Parser GSchem
 pT = do
   char 'T'
   spaces
-  x:y:color:size:visibility:show_name_value:angle:alignment:
+  x1:y1:color:size:visibility:show_name_value:angle:alignment:
     [] <- replicateM 8 pInt
-  -- Older schematics don't have line number counts
+  -- Same issue as in attribute parser
   num_lines <- try pInt <|> return 1
   newline
   text <- replicateM num_lines pToNL
   atts <- try pAtts <|> return []
-  return $ 
-    T x y color size visibility show_name_value angle alignment num_lines 
-      text atts
+  return T {..}
   where
     {--- Parse a string up to a New Line ---}
     pToNL = do ln <- many (noneOf "\n")
@@ -211,7 +199,7 @@ pN = do
   x1:y1:x2:y2:color:[] <- replicateM 5 pInt
   newline
   atts <- try pAtts <|> return []
-  return $ N x1 y1 x2 y2 color []
+  return N {..}
 
 {-- Parse a Bus --}
 pU :: Parser GSchem
@@ -221,7 +209,7 @@ pU = do
   x1:y1:x2:y2:color:ripperdir:[] <- replicateM 6 pInt
   newline
   atts <- try pAtts <|> return []
-  return $ U x1 y1 x2 y2 color ripperdir atts
+  return U {..}
 
 {-- Parse a Pin --}
 pP :: Parser GSchem
@@ -234,7 +222,7 @@ pP = do
   whichend <- try pInt <|> return (-1)
   newline
   atts <- try pAtts <|> return []
-  return $ P x1 y1 x2 y2 color pintype whichend atts
+  return P {..}
 
 {-- Parse a Component --}
 -- Parse a Component Object
@@ -242,12 +230,12 @@ pC :: Parser GSchem
 pC = do
   char 'C'
   spaces
-  x:y:selectable:angle:mirror:[] <- replicateM 5 pInt
+  x1:y1:selectable:angle:mirror:[] <- replicateM 5 pInt
   basename <- many (noneOf "\n")
   newline
   subcomp <- try pSubComp <|> return []
   atts <- try pAtts <|> return []
-  return $ C x y selectable angle mirror basename subcomp atts
+  return C {..}
 
 -- Parse a subcomponent
 pSubComp :: Parser [GSchem]
@@ -256,7 +244,7 @@ pSubComp = do
   objs <- many pObj
   char ']'
   newline
-  return $ objs
+  return objs
 
 {-- Parse a Path --}
 -- Parse a GSchem patH object
@@ -264,13 +252,12 @@ pH :: Parser GSchem
 pH = do
   char 'H'
   spaces
-  color:width:capstyle:dashstyle:dashlength:dashspace:filltype:fillwidth:
+  color:line_width:capstyle:dashstyle:dashlength:dashspace:filltype:fillwidth:
     angle1:pitch1:angle2:pitch2:num_lines:[] <- replicateM 13 pInt
   newline
   path <- replicateM num_lines pPath
   atts <- try pAtts <|> return []
-  return $ H color width capstyle dashstyle dashlength dashspace filltype 
-             fillwidth angle1 pitch1 angle2 pitch2 num_lines path atts
+  return H {..}
 
 -- Parse a path object
 pPath :: Parser Path
