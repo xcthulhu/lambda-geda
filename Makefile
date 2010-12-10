@@ -1,4 +1,4 @@
-PROGS = test geda-sexpress
+PROGS = parse-test geda-sexpress
 MODULES = Gaf.hs Gaf/*.hs
 
 all: $(PROGS) 
