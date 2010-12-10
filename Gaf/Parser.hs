@@ -180,9 +180,10 @@ pT = do
   x1:y1:color:size:visibility:show_name_value:angle:alignment:
     [] <- replicateM 8 pInt
   -- Same issue as in attribute parser
-  num_lines <- try pInt <|> return 1
+  num_lines <- try pInt <|> return (-1)
+  let actual_num_lines = case num_lines of { (-1) -> 1 ; _ -> num_lines }
   newline
-  text <- replicateM num_lines pToNL
+  text <- replicateM actual_num_lines pToNL
   atts <- try pAtts <|> return []
   return T {..}
   where
