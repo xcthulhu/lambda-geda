@@ -49,9 +49,9 @@ perhaps :: Int -> [String]
 perhaps i = case i of {(-1) -> []; _ -> [show i]}
 
 {- FIXME!  All of this line manipulation isn't very fast.  Maybe migrate 
-   everything to the WriterMonad?  But then again, more crazy
-   Haskell constructions = harder to understand, and it will only shave off a
-   few tenths of a second in practice. -}
+   everything to the WriterMonad?  But then again, more crazy Haskell 
+   constructions = harder to understand, and it will only shave off a few tenths 
+   of a second in practice. -}
 
 instance SExpr Att where
   sexpr Att {..} = sx $  ["T"]
