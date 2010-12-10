@@ -107,7 +107,7 @@ pv = do
   char 'v'
   spaces
   version <- pInt
-  fileformat_version <- if (version >= 20031004) then pInt else return (-1)
+  fileformat_version <- try pInt <|> return (-1)
   newline
   return Version {..}
 
