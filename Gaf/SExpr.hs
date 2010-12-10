@@ -58,8 +58,6 @@ instance SExpr Att where
                           angle_, alignment_] 
                    ++ perhaps num_lines_
                    ++ [ql $ ms [key ++ "=" ++ value]]
-      where
-        num_lines_perhaps = case num_lines_ of {(-1) -> [] ; _ -> [num_lines_]}
 
 instance SExpr GSchem where
   sexpr Version {..} = sx $  ["v"]
