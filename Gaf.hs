@@ -11,8 +11,7 @@ module Gaf where
        components may have embedded schematics associated with them.
 
    (2) Also note that unofficially, there can be "floating attributes"
-       in a schematic; these have a constructor "F" associated with them
--}
+       in a schematic; these have a constructor "F" associated with them    -}
 
 data GSchem = 
    Version {version, fileformat_version :: Int}
@@ -50,7 +49,7 @@ data Att = Att {x1_, y1_, color_, size_, visibility_, show_name_value_, angle_,
   deriving (Show, Eq, Ord)
 
 {- Paths are a subset of the SVG standard.  See the following for details:
-   http://www.geda.seul.org/wiki/geda:file_format_spec#path_data           -}
+   http://www.geda.seul.org/wiki/geda:file_format_spec#path_data            -}
 
 data Path = MM [(Int, Int)]
           | Mm [(Int, Int)]
