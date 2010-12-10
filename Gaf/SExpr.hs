@@ -28,8 +28,8 @@ class SExpr a where
 instance (SExpr a) => SExpr [a] where
   sexpr xs = "'(" ++ (intercalate " " $ map sexpr xs) ++ ")"
 
-{- This helper function that pads a list of string spaces and returns 
-   an SExpression -}
+{- This helper function pads a list of string spaces and returns an 
+   SExpression -}
 sx :: [String] -> SExpression
 sx ss = "(" ++ intercalate " " ss ++ ")"
 
