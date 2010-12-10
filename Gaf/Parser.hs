@@ -1,9 +1,10 @@
 {-# OPTIONS_GHC -XRecordWildCards #-}
 module Gaf.Parser (readGSchem) where
 
-import Text.ParserCombinators.Parsec hiding (spaces,newline)
-import Control.Monad (join,replicateM)
 import Gaf
+import Text.ParserCombinators.Parsec hiding (spaces,newline)
+import Control.Monad (replicateM)
+import Data.List (intercalate)
 
 {- This file provides parsing utilities for gEDA schematic files
    using the Haskell Parsec monad. -}
@@ -93,7 +94,7 @@ p1Att = do
   key <- many (noneOf "=\n")
   char '='
   values <- replicateM actual_num_lines pLine
-  let value = join values
+  let value = intercalate "\n" values
   return Att {..}
   where
     pLine = do val <- many (noneOf "\n")
