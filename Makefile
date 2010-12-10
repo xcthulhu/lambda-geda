@@ -1,4 +1,4 @@
-PROGS = test
+PROGS = test geda-sexpress
 MODULES = Gaf.hs Gaf/*.hs
 
 all: $(PROGS) 
@@ -7,4 +7,4 @@ all: $(PROGS)
 	ghc --make $< -o $@
 
 clean:
-	rm *.o *.hi Gaf/*.o Gaf/*.hi $(PROGS)
+	rm -f *.o *.hi *~ Gaf/*.o Gaf/*.hi Gaf/*~ $(PROGS) 
