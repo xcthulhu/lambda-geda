@@ -26,8 +26,7 @@ class SExpr a where
   sexpr :: a -> SExpression
 
 instance (SExpr a) => SExpr [a] where
-  sexpr xs = "'(" ++ y ++ ")"
-             where y = intercalate " " $ map sexpr xs
+  sexpr xs = "'(" ++ (intercalate " " $ map sexpr xs) ++ ")"
 
 {- This helper function that pads a list of string spaces and returns 
    an SExpression -}
