@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -XRecordWildCards #-}
-
+{-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances #-}
 module Gaf.SExpr (sexpr) where
 
 import Gaf
@@ -18,20 +17,27 @@ import Data.List (intercalate)
    coercing things into SExpressions.  SExpressions are themselves just
    strings. -}
 
+{- We use record wildcards extensively.  You may read about them here:
+   http://www.haskell.org/ghc/docs/latest/html/users_guide/syntax-extns.html#record-wildcards -}
+
 type SExpression = String
 
 class SExpr a where
   sexpr :: a -> SExpression
 
 instance (SExpr a) => SExpr [a] where
-  sexpr xs = let y = intercalate " " $ map sexpr xs in
-             "(" ++ y ++ ")"
+  sexpr xs = "'(" ++ y ++ ")"
+             where y = intercalate " " $ map sexpr xs
 
-{- This helper function applies a list of functions returning strings 
-   to its argument, pads with spaces and returns an SExpression -}
+{- This helper function that pads a list of string spaces and returns 
+   an SExpression -}
 sx :: [String] -> SExpression
 sx ss = "(" ++ intercalate " " ss ++ ")"
-                  
+
+{- This is the quoted version of sx; used for lists without identifiers -}
+ql :: [String] -> SExpression
+ql ss = "'" ++ sx ss
+
 {- "map (show .)": it is used often so it gets a helper function -}
 ms :: (Show a) => [a] -> [String]
 ms = map show
@@ -40,8 +46,8 @@ instance SExpr Att where
   sexpr Att {..} = sx $  ["T"]
                    ++ ms [x1_, y1_, color_, size_, visibility_, show_name_value_, 
                           angle_, alignment_, num_lines_] 
-                   ++ [sx $ ms [key ++ "=" ++ value]]
-                 
+                   ++ [ql $ ms [key ++ "=" ++ value]]
+
 instance SExpr GSchem where
   sexpr Version {..} = sx $  ["v"]
                        ++ ms [version, fileformat_version]
@@ -77,5 +83,50 @@ instance SExpr GSchem where
   sexpr T {..} = sx $  ["T"]
                  ++ ms [x1, y1, color, size, visibility, show_name_value, angle, 
                         alignment, num_lines]
-                 ++ [sx (ms text)]
+                 ++ [ql $ ms text]
                  ++ [sexpr atts]
+
+  sexpr N {..} = sx $  ["N"]
+                 ++ ms [x1, y1, x2, y2, color]
+                 ++ [sexpr atts]
+
+  sexpr U {..} = sx $  ["U"]
+                 ++ ms [x1, y1, x2, y2, color, ripperdir]
+                 ++ [sexpr atts]
+  
+  sexpr P {..} = sx $  ["U"]
+                 ++ ms [x1, y1, x2, y2, color, pintype, whichend]
+                 ++ [sexpr atts]
+
+  sexpr C {..} = sx $  ["C"]
+                 ++ ms [x1, y1, selectable, angle, mirror]
+                 ++ ms [basename]
+                 ++ [sexpr subcomp]
+                 ++ [sexpr atts]
+
+  sexpr H {..} = sx $  ["H"]
+                 ++ ms [color, line_width, capstyle, dashstyle, dashlength, 
+                        dashspace, filltype, fillwidth, angle1, pitch1, angle2, 
+                        pitch2, num_lines]
+                 ++ [sexpr path]
+                 ++ [sexpr atts]
+
+  sexpr (F att) = sexpr att
+
+instance SExpr Int where
+  sexpr = show
+
+instance SExpr a => SExpr (a, a) where
+  sexpr (x,y) = sexpr [x,y]
+
+instance SExpr a => SExpr (a, a, a) where
+  sexpr (x,y,z) = sexpr [x,y,z]
+
+instance SExpr Path where
+  sexpr (MM args) = sx $ ["M"] ++ [sexpr args]
+  sexpr (Mm args) = sx $ ["m"] ++ [sexpr args]
+  sexpr (LL args) = sx $ ["L"] ++ [sexpr args]
+  sexpr (Ll args) = sx $ ["l"] ++ [sexpr args]
+  sexpr (CC args) = sx $ ["C"] ++ [sexpr args]
+  sexpr (Cc args) = sx $ ["c"] ++ [sexpr args]
+  sexpr Z = sx $ ["Z"]
