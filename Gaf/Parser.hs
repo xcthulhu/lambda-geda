@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -XRecordWildCards #-}
 module Gaf.Parser (readGSchem) where
 
 import Text.ParserCombinators.Parsec hiding (spaces,newline)
@@ -81,17 +82,19 @@ p1Att :: Parser Att
 p1Att = do 
   char 'T'
   spaces
-  x1:y1:color:size:visibility:show_name_value:angle:alignment:
+  x1_:y1_:color_:size_:visibility_:show_name_value_:angle_:alignment_:
     [] <- replicateM 8 pInt
-  num_lines <- try pInt <|> return 1
+  {- num_lines_ parameter doesn't exist in legacy GSchems -}
+  num_lines_ <- try pInt <|> return (-1)
+  {- How many lines we actually read depends on whether we are reading legacy 
+     schematics -}
+  let actual_num_lines = case num_lines_ of { (-1) -> 1 ; _ -> num_lines_ }
   newline
   key <- many (noneOf "=\n")
   char '='
-  values <- replicateM num_lines pLine
+  values <- replicateM actual_num_lines pLine
   let value = join values
-  return $
-    Att x1 y1 color size visibility show_name_value angle alignment num_lines
-        key value
+  return Att {..}
   where
     pLine = do val <- many (noneOf "\n")
                newline
@@ -107,7 +110,6 @@ pv = do
   newline
   return $ Version version fileformat_version
 
--- FIXME! Lots of combinators look like this; maybe use TemplateHaskell?
 {--- Parse a Line ---}
 pL :: Parser GSchem
 pL = do 
