@@ -42,15 +42,30 @@ ql ss = "'" ++ sx ss
 ms :: (Show a) => [a] -> [String]
 ms = map show
 
+{- "perhaps i" makes a list containing a string showing an integer value,
+   provided i is a valid (ie, not equal to -1) and otherwise returns the
+   the empty list -}
+perhaps :: Int -> [String]
+perhaps i = case i of {(-1) -> []; _ -> [show i]}
+
+{- FIXME!  All of this line manipulation isn't very fast.  Maybe migrate 
+   everything to the WriterMonad?  But then again, more crazy
+   Haskell constructions = harder to understand, and it will only shave off a
+   few tenths of a second in practice. -}
+
 instance SExpr Att where
   sexpr Att {..} = sx $  ["T"]
                    ++ ms [x1_, y1_, color_, size_, visibility_, show_name_value_, 
-                          angle_, alignment_, num_lines_] 
+                          angle_, alignment_] 
+                   ++ perhaps num_lines_
                    ++ [ql $ ms [key ++ "=" ++ value]]
+      where
+        num_lines_perhaps = case num_lines_ of {(-1) -> [] ; _ -> [num_lines_]}
 
 instance SExpr GSchem where
   sexpr Version {..} = sx $  ["v"]
-                       ++ ms [version, fileformat_version]
+                       ++ ms [version]
+                       ++ perhaps fileformat_version
 
   sexpr L {..} = sx $  ["L"]
                  ++ ms [x1, y1, x2, y2, color, line_width, capstyle, dashstyle, 
@@ -82,9 +97,12 @@ instance SExpr GSchem where
   
   sexpr T {..} = sx $  ["T"]
                  ++ ms [x1, y1, color, size, visibility, show_name_value, angle, 
-                        alignment, num_lines]
+                        alignment]
+                 ++ perhaps num_lines
                  ++ [ql $ ms text]
                  ++ [sexpr atts]
+      where
+        num_lines_perhaps = case num_lines of {(-1) -> [] ; _ -> [num_lines]}
 
   sexpr N {..} = sx $  ["N"]
                  ++ ms [x1, y1, x2, y2, color]
@@ -94,8 +112,10 @@ instance SExpr GSchem where
                  ++ ms [x1, y1, x2, y2, color, ripperdir]
                  ++ [sexpr atts]
   
-  sexpr P {..} = sx $  ["U"]
-                 ++ ms [x1, y1, x2, y2, color, pintype, whichend]
+  sexpr P {..} = sx $  ["P"]
+                 ++ ms [x1, y1, x2, y2, color]
+                 ++ perhaps pintype
+                 ++ perhaps whichend
                  ++ [sexpr atts]
 
   sexpr C {..} = sx $  ["C"]
