@@ -40,10 +40,42 @@ instance SExpr Att where
   sexpr Att {..} = sx $  ["T"]
                    ++ ms [x1_, y1_, color_, size_, visibility_, show_name_value_, 
                           angle_, alignment_, num_lines_] 
-                   ++    [show $ key ++ "=" ++ value]
+                   ++ [sx $ ms [key ++ "=" ++ value]]
                  
 instance SExpr GSchem where
+  sexpr Version {..} = sx $  ["v"]
+                       ++ ms [version, fileformat_version]
+
   sexpr L {..} = sx $  ["L"]
                  ++ ms [x1, y1, x2, y2, color, line_width, capstyle, dashstyle, 
                         dashlength, dashspace]
+                 ++ [sexpr atts]
+  
+  sexpr G {..} = sx $  ["G"]
+                 ++ ms [x1, y1, box_width, box_height, angle, ratio, mirrored, 
+                        embedded]
+                 ++ ms [filename, enc_data]
+                 ++ [sexpr atts]
+
+  sexpr B {..} = sx $  ["B"]
+                 ++ ms [x1, y1, box_width, box_height, color, line_width, 
+                        capstyle, dashstyle, dashlength, dashspace, filltype, 
+                        fillwidth, angle1, pitch1, angle2, pitch2]
+                 ++ [sexpr atts]
+                 
+  sexpr V {..} = sx $  ["V"]
+                 ++ ms [x1, y1, radius, color, line_width, capstyle, dashstyle, 
+                        dashlength, dashspace, filltype, fillwidth, angle1, 
+                        pitch1, angle2, pitch2]
+                 ++ [sexpr atts]
+
+  sexpr A {..} = sx $  ["A"]
+                 ++ ms [x1, y1, radius, startangle, sweepangle, color, 
+                        line_width, capstyle, dashstyle, dashlength, dashspace]
+                 ++ [sexpr atts]
+  
+  sexpr T {..} = sx $  ["T"]
+                 ++ ms [x1, y1, color, size, visibility, show_name_value, angle, 
+                        alignment, num_lines]
+                 ++ [sx (ms text)]
                  ++ [sexpr atts]
