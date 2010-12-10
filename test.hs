@@ -9,7 +9,6 @@ tryParse :: String -> String -> IO ()
 tryParse fn x = case readGSchem x of
     Left err -> hPutStrLn stderr $ fn ++ " FAILED!\nReason: " ++ show err
     Right _ -> putStrLn $ fn ++ " PASSED!"
---    Right gschem -> putStrLn . show . last $ gschem
 
 main :: IO ()
 main = do
