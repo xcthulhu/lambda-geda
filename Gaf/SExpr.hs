@@ -101,8 +101,6 @@ instance SExpr GSchem where
                  ++ perhaps num_lines
                  ++ [ql $ ms text]
                  ++ [sexpr atts]
-      where
-        num_lines_perhaps = case num_lines of {(-1) -> [] ; _ -> [num_lines]}
 
   sexpr N {..} = sx $  ["N"]
                  ++ ms [x1, y1, x2, y2, color]
