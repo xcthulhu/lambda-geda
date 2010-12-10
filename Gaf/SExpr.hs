@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -XRecordWildCards #-}
+
 module Gaf.SExpr (sexpr) where
 
 import Gaf
@@ -27,16 +29,21 @@ instance (SExpr a) => SExpr [a] where
 
 {- This helper function applies a list of functions returning strings 
    to its argument, pads with spaces and returns an SExpression -}
-sx :: a -> [a -> String] -> SExpression
-sx x fs = let y = intercalate " " $ map (\f -> f x) fs in
-          "(" ++ y ++ ")"
+sx :: [String] -> SExpression
+sx ss = "(" ++ intercalate " " ss ++ ")"
                   
-{- "map (show .)": it is used often so it gets a helper function (not exported) -}
-ms :: (Show b) => [a -> b] -> [a -> String]
-ms = map (show .)
+{- "map (show .)": it is used often so it gets a helper function -}
+ms :: (Show a) => [a] -> [String]
+ms = map show
 
 instance SExpr Att where
-  sexpr att = sx att $
-              ms [x1_, y1_, color_, size_, visibility_, show_name_value_, angle_, 
-                  alignment_, num_lines_] ++ 
-                 [\x -> (show (key x ++ "=" ++ value x))]
+  sexpr Att {..} = sx $  ["T"]
+                   ++ ms [x1_, y1_, color_, size_, visibility_, show_name_value_, 
+                          angle_, alignment_, num_lines_] 
+                   ++    [show $ key ++ "=" ++ value]
+                 
+instance SExpr GSchem where
+  sexpr L {..} = sx $  ["L"]
+                 ++ ms [x1, y1, x2, y2, color, line_width, capstyle, dashstyle, 
+                        dashlength, dashspace]
+                 ++ [sexpr atts]
