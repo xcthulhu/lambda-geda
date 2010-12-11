@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -XRecordWildCards #-}
-module Gaf.Parser (readGSchem) where
+module Gaf.Parser where
 
 import Gaf
 import Text.ParserCombinators.Parsec hiding (spaces,newline)
