@@ -5,7 +5,6 @@ import System.Exit
 import System.IO
 import Gaf.Parser (readGSchem)
 import Gaf.SExpr (sexpr)
-import Data.List
 
 main = do
   pn <- getProgName
