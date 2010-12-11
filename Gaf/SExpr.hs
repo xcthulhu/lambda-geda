@@ -26,7 +26,7 @@ class SExpr a where
   sexpr :: a -> SExpression
 
 instance (SExpr a) => SExpr [a] where
-  sexpr xs = "'(" ++ (intercalate " " $ map sexpr xs) ++ ")"
+  sexpr xs = "'(" ++ dropWhile (' ' ==) (intercalate " " $ map sexpr xs) ++ ")"
 
 {- This helper function pads a list of string spaces and returns an 
    SExpression -}
@@ -60,6 +60,7 @@ instance SExpr Att where
                    ++ [ql $ ms [key ++ "=" ++ value]]
 
 instance SExpr GSchem where
+  sexpr (Filename _) = ""
   sexpr Version {..} = sx $  ["v"]
                        ++ ms [version]
                        ++ perhaps fileformat_version
@@ -116,7 +117,7 @@ instance SExpr GSchem where
   sexpr C {..} = sx $  ["C"]
                  ++ ms [x1, y1, selectable, angle, mirror]
                  ++ ms [basename]
-                 ++ [sexpr subcomp]
+                 ++ [sexpr emb_comp]
                  ++ [sexpr atts]
 
   sexpr H {..} = sx $  ["H"]

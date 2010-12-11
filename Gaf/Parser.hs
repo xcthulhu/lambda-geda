@@ -235,13 +235,14 @@ pC = do
   x1:y1:selectable:angle:mirror:[] <- replicateM 5 pInt
   basename <- many (noneOf "\n")
   newline
-  subcomp <- try pSubComp <|> return []
+  emb_comp <- try pEmbComp <|> return []
+  let sources = []
   atts <- try pAtts <|> return []
   return C {..}
 
 -- Parse a subcomponent
-pSubComp :: Parser [GSchem]
-pSubComp = do
+pEmbComp :: Parser [GSchem]
+pEmbComp = do
   string "[\n" 
   objs <- many pObj
   char ']'

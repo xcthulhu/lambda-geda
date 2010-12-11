@@ -45,6 +45,7 @@ instance GSchemShow Att where
     ++ key ++ "=" ++ value ++ "\n"
 
 instance GSchemShow GSchem where
+  showGSchem (Filename _) = ""
   showGSchem Version {..} =
     sx (["v"] ++ ms [version] ++ perhaps fileformat_version)
 
@@ -90,15 +91,15 @@ instance GSchemShow GSchem where
     sx (["U"] ++ ms [x1, y1, x2, y2, color, ripperdir]) ++ showGSchem atts
   
   showGSchem P {..} = 
-    sx (["P"] ++ ms [x1, y1, x2, y2, color] 
+    sx (["P"] ++ ms [x1, y1, x2, y2, color]
               ++ perhaps pintype 
               ++ perhaps whichend)
     ++ showGSchem atts
 
   showGSchem C {..} = 
     sx (["C"] ++ ms [x1, y1, selectable, angle, mirror] ++ [basename])
-    ++ case subcomp of { [] -> ""
-                       ; _  -> "[\n" ++ showGSchem subcomp ++ "]\n" }        
+    ++ case emb_comp of { [] -> ""
+                        ; _  -> "[\n" ++ showGSchem emb_comp ++ "]\n" }        
     ++ showGSchem atts
 
   showGSchem H {..} = 
