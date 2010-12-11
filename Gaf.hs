@@ -8,13 +8,16 @@ module Gaf where
 
    (1) Note that while the official specification does not say this
        explicitly, gschem data structures form trees.  This is because
-       components may have embedded schematics associated with them.
+       components may be hiearchical, and contain multiple sources.
 
    (2) Also note that unofficially, there can be "floating attributes"
-       in a schematic; these have a constructor "F" associated with them    -}
+       in a schematic; these have a constructor "F" associated with them    
+
+   (3) It is convenient to represent the filename of a schematic -}
 
 data GSchem = 
-   Version {version, fileformat_version :: Int}
+   Filename String
+ | Version {version, fileformat_version :: Int}
  | L {x1, y1, x2, y2, color, line_width, capstyle, dashstyle, dashlength, 
       dashspace :: Int, atts :: [Att]}
  | G {x1, y1, box_width, box_height, angle, ratio, mirrored, embedded :: Int,
@@ -33,7 +36,7 @@ data GSchem =
  | U {x1, y1, x2, y2, color, ripperdir :: Int, atts :: [Att]}
  | P {x1, y1, x2, y2, color, pintype, whichend :: Int, atts :: [Att]}
  | C {x1, y1, selectable, angle, mirror :: Int, basename :: String, 
-      subcomp :: [GSchem], atts :: [Att]}
+      emb_comp :: [GSchem], sources :: [[GSchem]], atts :: [Att]}
  | H {color, line_width, capstyle, dashstyle, dashlength, dashspace, filltype, 
       fillwidth, angle1, pitch1, angle2, pitch2, num_lines :: Int, 
       path :: [Path], atts :: [Att]}
