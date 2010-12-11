@@ -23,7 +23,7 @@ main = do
   case parse of
     Left err -> hPutStrLn stderr ("Error reading " ++ rn in_fn ++ ":" ++ show err)
                 >> exitFailure
-    Right gs -> hPutStrLn output $ showGSchem gs
+    Right gs -> hPutStr output $ showGSchem gs
   hClose input
   hClose output
   exitSuccess
