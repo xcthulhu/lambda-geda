@@ -1,9 +1,9 @@
 module Main( main ) where
 
-import System(getArgs)
+import System (getArgs)
 import System.IO
-import Control.Monad(forM_,liftM)
-import Gaf.Parser
+import Control.Monad (forM_,liftM)
+import Gaf.Parser (readGSchem)
 
 tryParse :: String -> String -> IO ()
 tryParse fn x = case readGSchem x of
