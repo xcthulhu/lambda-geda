@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances #-}
-module Gaf.GSchemShow (showGSchem) where
+module Gaf.ShowGSchem (showGSchem) where
 
 import Gaf
 import Data.List (intercalate)
@@ -78,7 +78,9 @@ instance GSchemShow GSchem where
   
   showGSchem T {..} = 
     sx (["T"] ++ ms [x1, y1, color, size, visibility, show_name_value, angle, 
-                     alignment])
+                     alignment]
+              ++ perhaps num_lines)
+    ++ join [ ln ++ "\n" | ln <- text]
     ++ showGSchem atts
     
   showGSchem N {..} = 
@@ -94,7 +96,7 @@ instance GSchemShow GSchem where
     ++ showGSchem atts
 
   showGSchem C {..} = 
-    sx (["C"] ++ ms [x1, y1, selectable, angle, mirror] ++ ms [basename])
+    sx (["C"] ++ ms [x1, y1, selectable, angle, mirror] ++ [basename])
     ++ case subcomp of { [] -> ""
                        ; _  -> "[\n" ++ showGSchem subcomp ++ "]\n" }        
     ++ showGSchem atts
