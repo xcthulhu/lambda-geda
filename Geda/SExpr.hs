@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances #-}
-module Gaf.SExpr (sexpr) where
+module Geda.SExpr (sexpr) where
 
-import Gaf
+import Geda.Core
 import Data.List (intercalate)
 
 {- In this module we write a printer which turns GSchem structures into

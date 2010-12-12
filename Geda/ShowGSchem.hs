@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances #-}
-module Gaf.ShowGSchem (showGSchem) where
+module Geda.ShowGSchem (showGSchem) where
 
-import Gaf
+import Geda.Core
 import Data.List (intercalate)
 import Control.Monad (join)
 

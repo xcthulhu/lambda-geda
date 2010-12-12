@@ -1,4 +1,4 @@
-module Gaf where
+module Geda.Core where
 
 {- The data structures below characterize the common specificiation of 
    .sch and .sym files which can be found here:
@@ -13,7 +13,7 @@ module Gaf where
    (2) Also note that unofficially, there can be "floating attributes"
        in a schematic; these have a constructor "F" associated with them    
 
-   (3) It is convenient to represent the filename of a schematic -}
+   (3) It is convenient to represent the filename of a schematic            -}
 
 data GSchem = 
    Filename String

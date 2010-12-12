@@ -1,5 +1,5 @@
 PROGS = parse-test parse-print-test geda-sexpress
-MODULES = Gaf.hs Gaf/*.hs
+MODULES = Geda/*.hs
 
 all: $(PROGS) 
 
@@ -7,4 +7,4 @@ all: $(PROGS)
 	ghc --make $< -o $@
 
 clean:
-	rm -f *.o *.hi *~ Gaf/*.o Gaf/*.hi Gaf/*~ $(PROGS) 
+	rm -f *.o *.hi *~ Geda/*.o Geda/*.hi Geda/*~ $(PROGS) 

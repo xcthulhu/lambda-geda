@@ -3,8 +3,8 @@ module Main( main ) where
 import System (getArgs,getProgName)
 import System.Exit
 import System.IO
-import Gaf.Parser (readGSchem)
-import Gaf.ShowGSchem (showGSchem)
+import Geda.Parser (readGSchem)
+import Geda.ShowGSchem (showGSchem)
 
 main = do
   pn <- getProgName

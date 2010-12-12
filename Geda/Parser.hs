@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -XRecordWildCards #-}
-module Gaf.Parser where
+module Geda.Parser where
 
-import Gaf
+import Geda.Core
 import Text.ParserCombinators.Parsec hiding (spaces,newline)
 import Control.Monad (replicateM)
 import Data.List (intercalate)
