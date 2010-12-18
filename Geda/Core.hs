@@ -43,6 +43,7 @@ data GSchemO a =
  | H {color, line_width, capstyle, dashstyle, dashlength, dashspace, 
       filltype, fillwidth, angle1, pitch1, angle2, pitch2, 
       num_lines :: Int, path :: [Path], atts :: [a]}
+ | F a
  | Att {x1, y1, color, size, visibility, show_name_value, angle, alignment, 
         num_lines :: Int, key, value :: String}
   deriving (Functor, Show, Eq, Ord)

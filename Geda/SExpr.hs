@@ -124,8 +124,7 @@ instance SExpr GSchem where
                         angle2, pitch2, num_lines]
                  ++ [sexpr path]
                  ++ [sexpr atts]
-
-  sexpr Att {..} = sexpr (Att {..}::Att)
+  sexpr (F att) = sexpr att
 
 instance SExpr Int where
   sexpr = show

@@ -31,7 +31,7 @@ readGSchem = parse pGSchem "gschem"
 -- This object parses an entry in a GSchem file to a corresponding
 -- object of type GSchem
 pObj :: Parser GSchem
-pObj = pv <|> pL <|> pG <|> pB <|> pV <|> pA <|> try p1Att <|> pT <|> pN 
+pObj = pv <|> pL <|> pG <|> pB <|> pV <|> pA <|> try pF <|> pT <|> pN 
        <|> pU <|> pP <|> pC <|> pH
 
 {--- Parse a newline or eof ---}
@@ -76,7 +76,7 @@ pAtts = do
   return atts 
 
 -- Parse a single attribute; works for both GSchems and Att subtypes
-p1Att :: Parser (GSchemO a)
+p1Att :: Parser Att
 p1Att = do 
   char 'T'
   spaces
@@ -258,6 +258,11 @@ pH = do
   atts <- try pAtts <|> return []
   return H {..}
 
+-- Parse combinator for floating attribute
+pF = do
+  att <- p1Att
+  return $ F att
+  
 -- Parse combinator for any Path
 pPath :: Parser Path
 pPath = pMM <|> pMm <|> pLL <|> pLl <|> pCC <|> pCc <|> pZ

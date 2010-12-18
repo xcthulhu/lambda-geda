@@ -113,7 +113,7 @@ instance GSchemShow GSchem where
     ++ showGSchem path
     ++ showGSchem atts
 
-  showGSchem Att {..} = showGSchem (Att {..}::Att)
+  showGSchem (F att) = showGSchem att
 
 instance GSchemShow Int where
   showGSchem = show
