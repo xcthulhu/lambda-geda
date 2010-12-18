@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances #-}
+{-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances
+                -XTypeSynonymInstances                          #-}
 module Geda.SExpr (sexpr) where
 
 import Geda.Core
@@ -37,7 +38,7 @@ sx ss = "(" ++ intercalate " " ss ++ ")"
 ql :: [String] -> SExpression
 ql ss = "'" ++ sx ss
 
-{- "map (show .)": it is used often so it gets a helper function -}
+{- "map show": it is used often so it gets a helper function -}
 ms :: (Show a) => [a] -> [String]
 ms = map show
 
@@ -47,55 +48,52 @@ ms = map show
 perhaps :: Int -> [String]
 perhaps i = case i of {(-1) -> []; _ -> [show i]}
 
-{- FIXME!  All of this line manipulation isn't very fast.  Maybe migrate 
-   everything to the WriterMonad?  But then again, more crazy Haskell 
-   constructions = harder to understand, and it will only shave off a few tenths 
-   of a second in practice. -}
-
 instance SExpr Att where
   sexpr Att {..} = sx $  ["T"]
-                   ++ ms [x1_, y1_, color_, size_, visibility_, show_name_value_, 
-                          angle_, alignment_] 
-                   ++ perhaps num_lines_
+                   ++ ms [x1, y1, color, size, visibility, show_name_value, 
+                          angle, alignment] 
+                   ++ perhaps num_lines
                    ++ [ql $ ms [key ++ "=" ++ value]]
 
 instance SExpr GSchem where
-  sexpr (Filename _) = ""
+  sexpr (Basename _) = ""
+  sexpr (Pathname _) = ""
   sexpr Version {..} = sx $  ["v"]
                        ++ ms [version]
                        ++ perhaps fileformat_version
 
   sexpr L {..} = sx $  ["L"]
-                 ++ ms [x1, y1, x2, y2, color, line_width, capstyle, dashstyle, 
-                        dashlength, dashspace]
+                 ++ ms [x1, y1, x2, y2, color, line_width, capstyle, 
+                        dashstyle, dashlength, dashspace]
                  ++ [sexpr atts]
   
   sexpr G {..} = sx $  ["G"]
-                 ++ ms [x1, y1, box_width, box_height, angle, ratio, mirrored, 
-                        embedded]
+                 ++ ms [x1, y1, box_width, box_height, angle, ratio, 
+                        mirrored, embedded]
                  ++ ms [filename, enc_data]
                  ++ [sexpr atts]
 
   sexpr B {..} = sx $  ["B"]
                  ++ ms [x1, y1, box_width, box_height, color, line_width, 
-                        capstyle, dashstyle, dashlength, dashspace, filltype, 
-                        fillwidth, angle1, pitch1, angle2, pitch2]
+                        capstyle, dashstyle, dashlength, dashspace, 
+                        filltype, fillwidth, angle1, pitch1, angle2, pitch2]
                  ++ [sexpr atts]
                  
   sexpr V {..} = sx $  ["V"]
-                 ++ ms [x1, y1, radius, color, line_width, capstyle, dashstyle, 
-                        dashlength, dashspace, filltype, fillwidth, angle1, 
-                        pitch1, angle2, pitch2]
+                 ++ ms [x1, y1, radius, color, line_width, capstyle, 
+                        dashstyle, dashlength, dashspace, filltype, 
+                        fillwidth, angle1, pitch1, angle2, pitch2]
                  ++ [sexpr atts]
 
   sexpr A {..} = sx $  ["A"]
                  ++ ms [x1, y1, radius, startangle, sweepangle, color, 
-                        line_width, capstyle, dashstyle, dashlength, dashspace]
+                        line_width, capstyle, dashstyle, dashlength, 
+                        dashspace]
                  ++ [sexpr atts]
   
   sexpr T {..} = sx $  ["T"]
-                 ++ ms [x1, y1, color, size, visibility, show_name_value, angle, 
-                        alignment]
+                 ++ ms [x1, y1, color, size, visibility, show_name_value, 
+                        angle, alignment]
                  ++ perhaps num_lines
                  ++ [ql $ ms text]
                  ++ [sexpr atts]
@@ -122,12 +120,12 @@ instance SExpr GSchem where
 
   sexpr H {..} = sx $  ["H"]
                  ++ ms [color, line_width, capstyle, dashstyle, dashlength, 
-                        dashspace, filltype, fillwidth, angle1, pitch1, angle2, 
-                        pitch2, num_lines]
+                        dashspace, filltype, fillwidth, angle1, pitch1, 
+                        angle2, pitch2, num_lines]
                  ++ [sexpr path]
                  ++ [sexpr atts]
 
-  sexpr (F att) = sexpr att
+  sexpr Att {..} = sexpr (Att {..}::Att)
 
 instance SExpr Int where
   sexpr = show

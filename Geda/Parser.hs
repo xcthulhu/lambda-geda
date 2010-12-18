@@ -20,22 +20,19 @@ import Data.List (intercalate)
    [Reference] Hackage Parsec Documentation
    http://hackage.haskell.org/package/parsec-2.0 -}
 
-{--- Parse a GSchem File ---}
+-- Parse a GSchem File
 pGSchem :: Parser [GSchem]
-pGSchem = do
-  obs <- many pObj
-  eof
-  return obs
+pGSchem = do { obs <- many pObj ; eof ; return obs }
 
 readGSchem :: String -> Either ParseError [GSchem]
 readGSchem = parse pGSchem "gschem"
 
-{--- Parse Any Object ---}
+-- Parse combinato for any GSchem
 -- This object parses an entry in a GSchem file to a corresponding
 -- object of type GSchem
 pObj :: Parser GSchem
-pObj = pv <|> pL <|> pG <|> pB <|> pV <|> pA <|> try pF <|> pT <|> pN <|> pU <|>
-       pP <|> pC <|> pH
+pObj = pv <|> pL <|> pG <|> pB <|> pV <|> pA <|> try p1Att <|> pT <|> pN 
+       <|> pU <|> pP <|> pC <|> pH
 
 {--- Parse a newline or eof ---}
 newline :: Parser ()
@@ -78,18 +75,18 @@ pAtts = do
   newline
   return atts 
 
--- Parse a single attribute
-p1Att :: Parser Att
+-- Parse a single attribute; works for both GSchems and Att subtypes
+p1Att :: Parser (GSchemO a)
 p1Att = do 
   char 'T'
   spaces
-  x1_:y1_:color_:size_:visibility_:show_name_value_:angle_:alignment_:
+  x1:y1:color:size:visibility:show_name_value:angle:alignment:
     [] <- replicateM 8 pInt
   {- num_lines_ parameter doesn't exist in legacy GSchems -}
-  num_lines_ <- try pInt <|> return (-1)
-  {- How many lines we actually read depends on whether we are reading legacy 
-     schematics -}
-  let actual_num_lines = case num_lines_ of { (-1) -> 1 ; _ -> num_lines_ }
+  num_lines <- try pInt <|> return (-1)
+  {- How many lines we actually read depends on whether we are reading 
+     legacy schematics -}
+  let actual_num_lines = case num_lines of { (-1) -> 1 ; _ -> num_lines }
   newline
   key <- many (noneOf "=\n")
   char '='
@@ -101,7 +98,7 @@ p1Att = do
                newline
                return val
 
-{--- Parse (the) Version ---}
+-- Parse combinator for the Version
 pv :: Parser GSchem
 pv = do 
   char 'v'
@@ -111,7 +108,7 @@ pv = do
   newline
   return Version {..}
 
-{--- Parse a Line ---}
+-- Parse combinator for a Line
 pL :: Parser GSchem
 pL = do 
   char 'L'
@@ -122,7 +119,7 @@ pL = do
   atts <- try pAtts <|> return []
   return $ L {..}
 
-{--- Parse a Graphic ---}
+-- Parse combinator for a Graphic
 pG :: Parser GSchem
 pG = do 
   char 'G'
@@ -139,7 +136,7 @@ pG = do
   atts <- try pAtts <|> return [] 
   return G {..}
 
-{--- Parse a Box ---}
+-- Parse combinator for a Box
 pB :: Parser GSchem
 pB = do 
   char 'B'
@@ -151,7 +148,7 @@ pB = do
   atts <- try pAtts <|> return [] 
   return B {..}
 
-{--- Parse a Circle ---}
+-- Parse combinator for a Circle
 pV :: Parser GSchem
 pV = do 
   char 'V'
@@ -162,7 +159,7 @@ pV = do
   atts <- try pAtts <|> return [] 
   return $ V {..}
 
-{--- Parse an Arc ---}
+-- Parse combinator for an Arc
 pA :: Parser GSchem
 pA = do
   char 'A'
@@ -193,7 +190,7 @@ pT = do
                newline
                return ln
 
-{-- Parse a Net --}
+-- Parse combinator for a Net
 pN :: Parser GSchem
 pN = do
   char 'N'
@@ -203,7 +200,7 @@ pN = do
   atts <- try pAtts <|> return []
   return N {..}
 
-{-- Parse a Bus --}
+-- Parse combinator a Bus
 pU :: Parser GSchem
 pU = do
   char 'U'
@@ -213,21 +210,21 @@ pU = do
   atts <- try pAtts <|> return []
   return U {..}
 
-{-- Parse a Pin --}
+-- Parse combinator for a Pin
 pP :: Parser GSchem
 pP = do
   char 'P'
   spaces
   x1:y1:x2:y2:color:[] <- replicateM 5 pInt
-  -- Some schematics don't have a pintype, and whichend is calculated sometimes 
+  {- Some schematics don't have a pintype, and whichend is calculated on
+     the fly sometimes -} 
   pintype <- try pInt <|> return (-1)
   whichend <- try pInt <|> return (-1)
   newline
   atts <- try pAtts <|> return []
   return P {..}
 
-{-- Parse a Component --}
--- Parse a Component Object
+-- Parse combinator for a Component
 pC :: Parser GSchem
 pC = do
   char 'C'
@@ -240,7 +237,7 @@ pC = do
   atts <- try pAtts <|> return []
   return C {..}
 
--- Parse a subcomponent
+-- Helper parser for an embedded component
 pEmbComp :: Parser [GSchem]
 pEmbComp = do
   string "[\n" 
@@ -249,8 +246,7 @@ pEmbComp = do
   newline
   return objs
 
-{-- Parse a Path --}
--- Parse a GSchem patH object
+-- Parse combinator for a GSchem patH
 pH :: Parser GSchem
 pH = do
   char 'H'
@@ -262,11 +258,11 @@ pH = do
   atts <- try pAtts <|> return []
   return H {..}
 
--- Parse a path object
+-- Parse combinator for any Path
 pPath :: Parser Path
 pPath = pMM <|> pMm <|> pLL <|> pLl <|> pCC <|> pCc <|> pZ
 
--- Parse an (absolute) MoveTo instruction
+-- Parse combinator for an (absolute) MoveTo instruction
 pMM :: Parser Path
 pMM = do
   char 'M'
@@ -275,7 +271,7 @@ pMM = do
   newline
   return $ MM moves
 
--- Parse a (relative) MoveTo instruction
+-- Parse combinator for a (relative) MoveTo instruction
 pMm :: Parser Path
 pMm = do
   char 'm'
@@ -284,7 +280,7 @@ pMm = do
   newline
   return $ Mm moves
 
--- Parse an (absolute) Line instruction
+-- Parse combinator for an (absolute) Line instruction
 pLL :: Parser Path
 pLL = do
   char 'L'
@@ -293,7 +289,7 @@ pLL = do
   newline
   return $ LL moves
 
--- Parse a (relative) Line instruction
+-- Parse combinator for a (relative  Line instruction
 pLl :: Parser Path
 pLl = do
   char 'l'
@@ -302,7 +298,7 @@ pLl = do
   newline
   return $ Ll moves
 
--- Parse an (absolute) Bezier Curve
+-- Parse combinator for an (absolute) Bezier Curve
 pCC :: Parser Path
 pCC = do
   char 'C'
@@ -311,7 +307,7 @@ pCC = do
   newline
   return $ CC moves
 
--- Parse an (relative) Bezier Curve
+-- Parse combinator for a (relative) Bezier Curve
 pCc :: Parser Path
 pCc = do
   char 'c'
@@ -320,14 +316,9 @@ pCc = do
   newline
   return $ Cc moves
 
--- Parse an Close-path instruction
+-- Parse combinator for a Close-path instruction
 pZ :: Parser Path
 pZ = do
    char 'Z' <|> char 'z'
    spaces
    return Z
-
-{-- Parse a Floating Attribute --}
-pF = do
-   att <- p1Att
-   return $ F att

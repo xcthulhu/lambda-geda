@@ -1,4 +1,7 @@
+{-# OPTIONS_GHC -XDeriveFunctor #-}
 module Geda.Core where
+import Data.Foldable
+import Data.Traversable
 
 {- The data structures below characterize the common specificiation of 
    .sch and .sym files which can be found here:
@@ -7,52 +10,51 @@ module Geda.Core where
    We have a few points to add:
 
    (1) Note that while the official specification does not say this
-       explicitly, gschem data structures form trees.  This is because
-       components may be hiearchical, and contain multiple sources.
+       explicitly, gschem data structures form trees.  Specifically,
+       we may think of attributes as "leaves" and hierarchical components
+       as "branches".  To this end, GSchemO is an instance of "Functor"
 
-   (2) Also note that unofficially, there can be "floating attributes"
-       in a schematic; these have a constructor "F" associated with them    
+   (2) We also represent the basename/pathname metadata of schematics,
+       which is not in the spec.                                         -}
 
-   (3) It is convenient to represent the filename of a schematic            -}
-
-data GSchem = 
-   Filename String
+data GSchemO a = 
+   Basename String
+ | Pathname String
  | Version {version, fileformat_version :: Int}
  | L {x1, y1, x2, y2, color, line_width, capstyle, dashstyle, dashlength, 
-      dashspace :: Int, atts :: [Att]}
- | G {x1, y1, box_width, box_height, angle, ratio, mirrored, embedded :: Int,
-      filename, enc_data :: String, atts :: [Att]}
- | B {x1, y1, box_width, box_height, color, line_width, capstyle, dashstyle, 
+      dashspace :: Int, atts :: [a]}
+ | G {x1, y1, box_width, box_height, angle, ratio, mirrored, 
+      embedded :: Int, filename, enc_data :: String, atts :: [a]}
+ | B {x1, y1, box_width, box_height, color, line_width, capstyle, dashstyle,
       dashlength, dashspace, filltype, fillwidth, angle1, pitch1, angle2, 
-      pitch2 :: Int, atts :: [Att]}
+      pitch2 :: Int, atts :: [a]}
  | V {x1, y1, radius, color, line_width, capstyle, dashstyle, dashlength, 
-      dashspace, filltype, fillwidth, angle1, pitch1, angle2, pitch2 :: Int, 
-      atts :: [Att]}
+      dashspace, filltype, fillwidth, angle1, pitch1, angle2, pitch2 :: Int,
+      atts :: [a]}
  | A {x1, y1, radius, startangle, sweepangle, color, line_width, capstyle, 
-      dashstyle, dashlength, dashspace :: Int, atts :: [Att]}
+      dashstyle, dashlength, dashspace :: Int, atts :: [a]}
  | T {x1, y1, color, size, visibility, show_name_value, angle, alignment, 
-      num_lines :: Int, text :: [String], atts :: [Att]}  
- | N {x1, y1, x2, y2, color :: Int, atts :: [Att]}
- | U {x1, y1, x2, y2, color, ripperdir :: Int, atts :: [Att]}
- | P {x1, y1, x2, y2, color, pintype, whichend :: Int, atts :: [Att]}
+      num_lines :: Int, text :: [String], atts :: [a]}  
+ | N {x1, y1, x2, y2, color :: Int, atts :: [a]}
+ | U {x1, y1, x2, y2, color, ripperdir :: Int, atts :: [a]}
+ | P {x1, y1, x2, y2, color, pintype, whichend :: Int, atts :: [a]}
  | C {x1, y1, selectable, angle, mirror :: Int, basename :: String, 
-      emb_comp :: [GSchem], sources :: [[GSchem]], atts :: [Att]}
- | H {color, line_width, capstyle, dashstyle, dashlength, dashspace, filltype, 
-      fillwidth, angle1, pitch1, angle2, pitch2, num_lines :: Int, 
-      path :: [Path], atts :: [Att]}
- | F Att
-  deriving (Show, Eq, Ord)
+      emb_comp :: [GSchemO a], sources :: [[GSchemO a]], atts :: [a]}
+ | H {color, line_width, capstyle, dashstyle, dashlength, dashspace, 
+      filltype, fillwidth, angle1, pitch1, angle2, pitch2, 
+      num_lines :: Int, path :: [Path], atts :: [a]}
+ | Att {x1, y1, color, size, visibility, show_name_value, angle, alignment, 
+        num_lines :: Int, key, value :: String}
+  deriving (Functor, Show, Eq, Ord)
 
-{- Attributes are just like text, only they have a key-value pair at the end
-   Note: we have eliminated the "num_lines" field because it is meaningless
-         in the context of attributes.                                      -}
-
-data Att = Att {x1_, y1_, color_, size_, visibility_, show_name_value_, angle_, 
-                alignment_, num_lines_ :: Int, key, value :: String} 
-  deriving (Show, Eq, Ord)
+{- It's convenient to think of "Attribute" as a subtype of GschemO.
+   However, it is not possible to express this in Haskell; so we use 
+   a type synonym as a compromise. -}
+type Att = GSchemO ()
+type GSchem = GSchemO Att
 
 {- Paths are a subset of the SVG standard.  See the following for details:
-   http://www.geda.seul.org/wiki/geda:file_format_spec#path_data            -}
+   http://www.geda.seul.org/wiki/geda:file_format_spec#path_data       -}
 
 data Path = MM [(Int, Int)]
           | Mm [(Int, Int)]

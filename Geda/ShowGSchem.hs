@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances #-}
+{-# OPTIONS_GHC -XRecordWildCards -XFlexibleInstances 
+                -XTypeSynonymInstances                          #-}
 module Geda.ShowGSchem (showGSchem) where
 
 import Geda.Core
@@ -39,13 +40,14 @@ perhaps i = case i of {(-1) -> []; _ -> [show i]}
 
 instance GSchemShow Att where
   showGSchem Att {..} = 
-    sx (["T"] ++ ms [x1_, y1_, color_, size_, visibility_, show_name_value_,
-                     angle_, alignment_] 
-              ++ perhaps num_lines_)
+    sx (["T"] ++ ms [x1, y1, color, size, visibility, show_name_value,
+                     angle, alignment] 
+              ++ perhaps num_lines)
     ++ key ++ "=" ++ value ++ "\n"
 
 instance GSchemShow GSchem where
-  showGSchem (Filename _) = ""
+  showGSchem (Basename _) = ""
+  showGSchem (Pathname _) = ""
   showGSchem Version {..} =
     sx (["v"] ++ ms [version] ++ perhaps fileformat_version)
 
@@ -56,8 +58,10 @@ instance GSchemShow GSchem where
   
   showGSchem G {..} = 
     sx (["G"] ++ ms [x1, y1, box_width, box_height, angle, ratio, mirrored, 
-                     embedded]
-              ++ ms [filename, enc_data])
+                     embedded]) ++ "\n"
+              ++ filename ++ "\n"
+              ++ if (embedded==1) then enc_data ++ "\n.\n"
+                                  else ""
     ++ showGSchem atts
 
   showGSchem B {..} = 
@@ -109,7 +113,7 @@ instance GSchemShow GSchem where
     ++ showGSchem path
     ++ showGSchem atts
 
-  showGSchem (F att) = showGSchem att
+  showGSchem Att {..} = showGSchem (Att {..}::Att)
 
 instance GSchemShow Int where
   showGSchem = show
