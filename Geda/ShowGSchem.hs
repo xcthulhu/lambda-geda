@@ -103,12 +103,12 @@ instance GSchemShow GSchem where
   showGSchem C {..} = 
     sx (["C"] ++ ms [x1, y1, selectable, angle, mirror] ++ [basename])
     ++ case emb_comp of { [] -> ""
-                        ; _  -> "[\n" ++ showGSchem emb_comp ++ "]\n" }        
+                        ; _  -> "[\n" ++ showGSchem emb_comp ++ "]\n" }
     ++ showGSchem atts
 
   showGSchem H {..} = 
     sx (["H"] ++ ms [color, line_width, capstyle, dashstyle, dashlength, 
-                     dashspace, filltype, fillwidth, angle1, pitch1, angle2, 
+                     dashspace, filltype, fillwidth, angle1, pitch1, angle2,
                      pitch2, num_lines])
     ++ showGSchem path
     ++ showGSchem atts
