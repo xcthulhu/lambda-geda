@@ -1,7 +1,6 @@
-{-# OPTIONS_GHC -XDeriveFunctor #-}
+{-# OPTIONS_GHC -XRecordWildCards -XDeriveFunctor #-}
 module Geda.Core where
-import Data.Foldable
-import Data.Traversable
+import Data.Functor
 
 {- The data structures below characterize the common specificiation of 
    .sch and .sym files which can be found here:
@@ -47,6 +46,25 @@ data GSchemO a =
  | Att {x1, y1, color, size, visibility, show_name_value, angle, alignment, 
         num_lines :: Int, key, value :: String}
   deriving (Functor, Show, Eq, Ord)
+
+{- Components have two kinds of attributes: attached and inherited. 
+   Inherited attributes come from the embedded symbol schematic -}
+in_atts :: GSchemO a -> [a]
+in_atts C {..} = map (\(F a) -> a) $ filter floating emb_comp
+  where 
+    floating (F _) = True
+    floating _ = False
+
+{- Some objects do not naturally have attributes, but it's convenient 
+   to have an attribute function that works uniformly.  The following
+   function does this. -}
+attributes :: GSchemO a -> [a]
+attributes (Basename _) = []
+attributes (Pathname _) = []
+attributes (Version {..}) = []
+attributes (F att) = [att]
+attributes obj@(C {..}) = atts ++ in_atts obj
+attributes obj = atts obj
 
 {- It's convenient to think of "Attribute" as a subtype of GschemO.
    However, it is not possible to express this in Haskell; so we use 
