@@ -13,7 +13,7 @@ main = do
                                   >> exitSuccess
                              else return ()
   let in_fn = if (length args >= 1) then (args !! 0) else "-"           
-  let out_fn = if (length args >= 2) then (args !! 2) else "-"
+  let out_fn = if (length args >= 2) then (args !! 1) else "-"
   input <- case in_fn of { "-" -> return stdin
                          ;  _  -> openFile in_fn ReadMode }
   output <- case out_fn of { "-" -> return stdout
