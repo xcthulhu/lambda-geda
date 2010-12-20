@@ -20,6 +20,7 @@ main = do
   (comps, sources) <- getLibraries
   hierarchical_schems <- expandHierarchies comps sources raw_schems
   let flattened_schems = flattenHierarchies hierarchical_schems
-  sequence_ $ do { schem <- flattened_schems
+  let fixed_schems = unembedHierarchies flattened_schems
+  sequence_ $ do { schem <- fixed_schems
                  ; let bname = baseName schem
                  ; return $ putGSchematic (outdir</>bname) schem }

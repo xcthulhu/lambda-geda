@@ -6,11 +6,11 @@ import Geda.Parser (readGSchem)
 import Geda.ShowGSchem (showGSchem)
 import System (exitFailure)
 import System.FilePath (splitFileName, (</>), equalFilePath)
-import System.Directory (canonicalizePath)
+import System.Directory (canonicalizePath,getCurrentDirectory)
 import System.Posix.Files
 import System.IO
 import System.Process (readProcess)
-import Data.List (lines, nubBy, splitAt, find)
+import Data.List (lines, nubBy, splitAt, find, isPrefixOf)
 import Control.Monad (liftM2, mapM, forM, join)
 
 -- |Open and parse a schematic from a FilePath
@@ -48,18 +48,19 @@ baseName gschem = bname
 -- |Returns the component and source libraries loaded by calling gnetlist
 getLibraries :: IO ([FilePath],[FilePath]) 
 getLibraries = do
+  pwd <- getCurrentDirectory
   raw_list <- readProcess 
               "gnetlist" ["-q"             -- Be quiet
                          ,"-l","/dev/stdin" -- Run a command we feed
                          ,"-g","geda"     -- Pretend to netlist geda
                          ,"-o","/dev/null" -- But throw away output
                          ,"/dev/null"     -- Don't use any input files
-                         ] schemeProg
-  let entries = map (splitAt 1) $ reverse . lines $ raw_list
-  components <- mapM (canonicalizePath . snd) 
-                $ filter (\ (x,_) -> (x == "c")) entries
-  sources <- mapM (canonicalizePath . snd) 
-             $ filter (\ (x,_) -> (x == "s")) entries
+                         ] $ schemeProg pwd
+  let entries = reverse . lines $ raw_list
+  components <- mapM (canonicalizePath.tail) 
+                $ filter (\x -> (x !! 0 == 'c')) entries
+  sources <- mapM (canonicalizePath . tail) 
+             $ filter (\x -> (x !! 0 == 's')) entries
   -- Return the lists with duplicates thrown away
   return (nubBy equalFilePath components,
           nubBy equalFilePath sources)
@@ -68,15 +69,14 @@ getLibraries = do
        stdin). It loads all of the libraries, and prints them to 
        "/dev/stdout", one library per line.  The sort of library is
        identified by the first letter. -}
-    schemeProg = 
+    schemeProg pwd = 
       "(define load-if-present (lambda (f) (if (file-exists? f) (load f))))"
       ++ "(define (component-library dir . rst)" 
         ++ "(begin (display \"c\") (display dir) (display \"\\n\")))"
       ++ "(define (source-library dir . rst)" 
         ++ "(begin (display \"s\") (display dir) (display \"\\n\")))"
       ++ "(load (build-path geda-rc-path \"system-gafrc\"))"
-      ++ "(load-if-present (build-path (getenv \"HOME\") \".gEDA/gafrc\"))"
-      ++ "(load-if-present \"gafrc\")"
+      ++ "(load-if-present \"" ++ pwd ++ "/gafrc\")"
 
 -- |Looks up a file in a list of library directories, dies if DNE
 fullPathLookup :: FilePath -> [FilePath] -> IO FilePath
@@ -88,12 +88,14 @@ fullPathLookup fn (lib:libs) = do
     else fullPathLookup fn libs
 
 -- |Expands embedded components given a list of libraries
-expandEmbeddedComponent :: [FilePath] -> GSchem -> IO (GSchem)
-expandEmbeddedComponent libs (C {..}) = do
-  new_emb_comp <- getGSchematic =<< fullPathLookup basename libs
-  return C {emb_comp = new_emb_comp, ..}
+embedComps :: [FilePath] -> GSchem -> IO (GSchem)
+embedComps libs obj@(C {..})
+  | emb_comp /= [] = return obj
+  | otherwise = 
+    do new_emb_comp <- getGSchematic =<< fullPathLookup basename libs
+       return C {emb_comp = new_emb_comp, ..}
   
-expandEmbeddedComponent _ obj = return obj
+embedComps _ obj = return obj
 
 -- | Gets the values for a key from a list of attributes
 getAllAtts :: GSchem -> String -> [String]
@@ -109,8 +111,8 @@ getAtt obj mykey =
   if (vals == []) then Nothing else Just (head vals)
 
 -- |Expands the sources for a component object
-expandSources :: [FilePath] -> GSchem -> IO GSchem
-expandSources libs obj@(C {..}) =
+hCompSources :: [FilePath] -> GSchem -> IO GSchem
+hCompSources libs obj@(C {..}) =
   if (getAtt obj "graphical" == Just "1") then return obj
   else do
     let source_basenames = getAllAtts obj "source"
@@ -118,18 +120,18 @@ expandSources libs obj@(C {..}) =
     new_sources <- mapM getGSchematic source_fullnames
     return C {sources = new_sources, ..}
     
-expandSources _ obj = return obj
+hCompSources _ obj = return obj
 
 -- |Recursively expands the hierarchy underneath a component
 -- graphical components are omitted
 expandHComps :: [FilePath] -> [FilePath] -> GSchem -> IO GSchem
-expandHComps clibs slibs comp@(C {..}) = do
-  C {..} <- expandSources slibs =<< 
-            expandEmbeddedComponent clibs comp
-  expanded_sources <- expandHierarchies clibs slibs sources
-  return C {sources = expanded_sources, ..}
+expandHComps clibs slibs obj@(C {..}) 
+  | sources /= [] = return obj
+  | otherwise = do C {..} <- hCompSources slibs =<< embedComps clibs obj
+                   expanded_sources <- expandHierarchies clibs slibs sources
+                   return C {sources = expanded_sources, ..}
   
-expandHComp _ _ obj = return obj
+expandHComps _ _ obj = return obj
 
 -- |Expands a list of schematics into a list of hierarchical schematics
 expandHierarchies :: [FilePath] -> [FilePath] -> [[GSchem]] -> IO [[GSchem]]
@@ -139,12 +141,14 @@ expandHierarchies clibs slibs gschems =
 -- |Updates a refdes attribute
 updRefdesAtt :: String -> Att -> Att
 updRefdesAtt rd att@(Att {..}) 
+  | rd == "" = att
   | key == "refdes" = Att {value = rd </> value, ..}
   | otherwise = att
 
 -- |Recursively changes refdes and basenames to reflect their refdes parents
 refdesRename :: String -> GSchem -> GSchem
-refdesRename rd (Basename bn) = Basename $ rd ++ "-" ++ bn
+refdesRename rd obj@(Basename bn) | rd == "" = obj
+                                  | otherwise = Basename $ rd ++ "-" ++ bn
 refdesRename rd obj@(C {..}) = 
   let (Just rd') = getAtt obj "refdes" 
       new_sources = (map.map) (refdesRename rd') sources in
@@ -185,3 +189,19 @@ flattenHierarchies gschems = do
               ; return obj' }
   new_schem <- g':(concatMap subGSchematics g')
   return new_schem
+
+-- |Unembeds components, provided that the symbol name does
+-- begin with "EMBEDDED"
+unembedComp :: GSchem -> GSchem
+unembedComp obj@(C {..})
+ | "EMBEDDED" `isPrefixOf` basename = obj
+ | otherwise = C {emb_comp = [], ..}
+
+-- |Removes all embedded components from a list of hierarchies
+unembedHierarchies :: [[GSchem]] -> [[GSchem]]
+unembedHierarchies gschems = do
+  g <- gschems
+  let g' = do { obj <- g
+              ; let obj' = mapGSchem unembedComp obj
+              ; return obj' }
+  return g'
