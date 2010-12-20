@@ -1,4 +1,4 @@
-PROGS = parse-test parse-print-test geda-sexpress
+PROGS = parse-test parse-print-test geda-sexpress flatten-hierarchy
 MODULES = Geda/*.hs
 
 all: $(PROGS) 
