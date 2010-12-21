@@ -1,0 +1,4 @@
+This directory a few modules written in Haskell for manipulating GSchem files,
+and a few preliminary applications.
+
+This software is strictly alpha quality, and poorly documented :(  The user is advised to treat this software accordingly.
