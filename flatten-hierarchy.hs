@@ -5,6 +5,7 @@ import System.Exit
 import System.FilePath ((</>))
 import System.IO
 import Geda.Hierarchical
+import Geda.IO
 
 main = do
   pn <- getProgName
