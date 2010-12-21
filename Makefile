@@ -8,3 +8,4 @@ all: $(PROGS)
 
 clean:
 	rm -f *.o *.hi *~ Geda/*.o Geda/*.hi Geda/*~ $(PROGS) 
+	rm -rf tests/SXI/flatten

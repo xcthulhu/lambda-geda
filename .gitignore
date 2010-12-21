@@ -8,3 +8,5 @@ parse-test
 parse-print-test
 geda-sexpress
 flatten-hierarchy
+tests/SXI/flatten/*
+tests/SXI/flatten
