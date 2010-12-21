@@ -6,7 +6,8 @@ import Data.List (find, isPrefixOf)
 import Geda.Core
 import System.FilePath ((</>))
 
--- |Pure functions for manipulating Hierarchical schematics
+{- This module contains pure functions for manipulating Hierarchical 
+   schematics -}
 
 -- |Get the basename of a schematic
 baseName :: [GSchem] -> String
@@ -16,14 +17,16 @@ baseName gschem = bname
     bases (Basename _) = True
     bases _ = False
 
--- | Gets the values for a key from a list of attributes
+-- |Gets the all values for a given GSchem object indexed by an attribute 
+-- key
 getAllAtts :: GSchem -> String -> [String]
 getAllAtts obj mykey =
     map (\ Att {..} -> value) 
     $ filter (\ Att {..} -> (key == mykey)) 
     $ attributes obj
 
--- |Gets the first value for a key from a list of attributes
+-- |Gets the first value for a given GSchem object indexed by an attribute 
+-- key
 getAtt :: GSchem -> String -> Maybe String
 getAtt obj mykey =
   let vals = getAllAtts obj mykey in
