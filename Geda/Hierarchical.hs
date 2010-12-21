@@ -7,7 +7,7 @@ import Geda.ShowGSchem (showGSchem)
 import System (exitFailure)
 import System.FilePath (splitFileName, (</>), equalFilePath)
 import System.Directory (canonicalizePath,getCurrentDirectory)
-import System.Posix.Files
+import System.Posix.Files (fileExist)
 import System.IO
 import System.Process (readProcess)
 import Data.List (lines, nubBy, splitAt, find, isPrefixOf)
@@ -104,29 +104,34 @@ getAllAtts obj mykey =
     $ filter (\ Att {..} -> (key == mykey)) 
     $ attributes obj
 
--- | Gets the first value for a key from a list of attributes
+-- |Gets the first value for a key from a list of attributes
 getAtt :: GSchem -> String -> Maybe String
 getAtt obj mykey =
   let vals = getAllAtts obj mykey in
   if (vals == []) then Nothing else Just (head vals)
 
+-- |Map a transformation over a hierarchical GSchem object
+mapGSchem :: (GSchem -> GSchem) -> GSchem -> GSchem
+mapGSchem f C {..} = f C {sources = (map.map) f sources, 
+                          emb_comp = map f emb_comp, ..}
+mapGSchem f obj = f obj
+
 -- |Expands the sources for a component object
 hCompSources :: [FilePath] -> GSchem -> IO GSchem
-hCompSources libs obj@(C {..}) =
-  if (getAtt obj "graphical" == Just "1") then return obj
-  else do
-    let source_basenames = getAllAtts obj "source"
-    source_fullnames <- mapM (`fullPathLookup` libs) source_basenames
-    new_sources <- mapM getGSchematic source_fullnames
-    return C {sources = new_sources, ..}
+hCompSources libs obj@(C {..}) = do
+  let source_basenames = getAllAtts obj "source"
+  source_fullnames <- mapM (`fullPathLookup` libs) source_basenames
+  new_sources <- mapM getGSchematic source_fullnames
+  return C {sources = new_sources, ..}
     
 hCompSources _ obj = return obj
 
--- |Recursively expands the hierarchy underneath a component
--- graphical components are omitted
+-- |Recursively expands the hierarchy underneath a component.  
+-- Components with a "graphical" attribute are not followed.
 expandHComps :: [FilePath] -> [FilePath] -> GSchem -> IO GSchem
 expandHComps clibs slibs obj@(C {..}) 
   | sources /= [] = return obj
+  | getAtt obj "graphical" /= Nothing = return obj
   | otherwise = do C {..} <- hCompSources slibs =<< embedComps clibs obj
                    expanded_sources <- expandHierarchies clibs slibs sources
                    return C {sources = expanded_sources, ..}
@@ -154,12 +159,6 @@ refdesRename rd obj@(C {..}) =
       new_sources = (map.map) (refdesRename rd') sources in
   fmap (updRefdesAtt rd) $ C {sources = new_sources, ..}
 refdesRename rd obj = fmap (updRefdesAtt rd) obj
-
--- |Map a transformation over a hierarchical GSchem object
-mapGSchem :: (GSchem -> GSchem) -> GSchem -> GSchem
-mapGSchem f C {..} = f C {sources = (map.map) f sources, 
-                          emb_comp = map f emb_comp, ..}
-mapGSchem f obj = f obj
 
 -- |Make a hierarchical component graphical
 makeHCompGraphical :: GSchem -> GSchem
@@ -196,6 +195,8 @@ unembedComp :: GSchem -> GSchem
 unembedComp obj@(C {..})
  | "EMBEDDED" `isPrefixOf` basename = obj
  | otherwise = C {emb_comp = [], ..}
+
+unembedComp obj = obj
 
 -- |Removes all embedded components from a list of hierarchies
 unembedHierarchies :: [[GSchem]] -> [[GSchem]]

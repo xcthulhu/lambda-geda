@@ -18,9 +18,9 @@ main = do
   let files = tail args
   raw_schems <- mapM getGSchematic files
   (comps, sources) <- getLibraries
-  hierarchical_schems <- expandHierarchies comps sources raw_schems
-  let flattened_schems = flattenHierarchies hierarchical_schems
-  let fixed_schems = unembedHierarchies flattened_schems
+  schems' <- expandHierarchies comps sources raw_schems
+  let fixed_schems =   flattenHierarchies
+                     $ unembedHierarchies schems'  
   sequence_ $ do { schem <- fixed_schems
                  ; let bname = baseName schem
                  ; return $ putGSchematic (outdir</>bname) schem }
