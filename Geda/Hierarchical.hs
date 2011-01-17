@@ -32,12 +32,6 @@ getAtt obj mykey =
   let vals = getAllAtts obj mykey in
   if (vals == []) then Nothing else Just (head vals)
 
--- |Map a transformation over a hierarchical GSchem object
-mapGSchem :: (GSchem -> GSchem) -> GSchem -> GSchem
-mapGSchem f C {..} = f C {sources = (map.map) f sources, 
-                          emb_comp = map f emb_comp, ..}
-mapGSchem f obj = f obj
-
 -- |Updates a refdes attribute
 updRefdesAtt :: String -> Att -> Att
 updRefdesAtt rd att@(Att {..}) 
@@ -52,8 +46,8 @@ refdesRename rd obj@(Basename bn) | rd == "" = obj
 refdesRename rd obj@(C {..}) = 
   let (Just rd') = getAtt obj "refdes" 
       new_sources = (map.map) (refdesRename rd') sources in
-  fmap (updRefdesAtt rd) $ C {sources = new_sources, ..}
-refdesRename rd obj = fmap (updRefdesAtt rd) obj
+  attMap (updRefdesAtt rd) $ C {sources = new_sources, ..}
+refdesRename rd obj = attMap (updRefdesAtt rd) obj
 
 -- |Make a hierarchical component graphical
 makeHCompGraphical :: GSchem -> GSchem
@@ -78,7 +72,7 @@ flattenHierarchies :: [[GSchem]] -> [[GSchem]]
 flattenHierarchies gschems = do
   g <- gschems
   let g' = do { obj <- g 
-              ; let obj' = mapGSchem makeHCompGraphical 
+              ; let obj' = gschemMap makeHCompGraphical 
                            $ refdesRename "" obj
               ; return obj' }
   new_schem <- g':(concatMap subGSchematics g')
@@ -98,6 +92,6 @@ unembedHierarchies :: [[GSchem]] -> [[GSchem]]
 unembedHierarchies gschems = do
   g <- gschems
   let g' = do { obj <- g
-              ; let obj' = mapGSchem unembedComp obj
+              ; let obj' = gschemMap unembedComp obj
               ; return obj' }
   return g'
