@@ -10,7 +10,7 @@ import Geda.IO
 main = do
   pn <- getProgName
   args <- getArgs
-  if (any (=="--help") args) 
+  if ((any (=="--help") args) || args == [])
     then putStrLn ("Usage: " ++ pn ++ 
                    " [OUTPUTDIRECTORY] [[INPUT1] [INPUT2] [INPUT3]]") 
          >> exitSuccess
