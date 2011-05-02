@@ -27,7 +27,7 @@ pGSchem = do { obs <- many pObj ; eof ; return obs }
 readGSchem :: String -> Either ParseError [GSchem]
 readGSchem = parse pGSchem "gschem"
 
--- Parse combinato for any GSchem
+-- Parse combinator for any GSchem
 -- This object parses an entry in a GSchem file to a corresponding
 -- object of type GSchem
 pObj :: Parser GSchem
@@ -36,7 +36,7 @@ pObj = pv <|> pL <|> pG <|> pB <|> pV <|> pA <|> try pF <|> pT <|> pN
 
 {--- Parse a newline or eof ---}
 newline :: Parser ()
-newline = try (char '\n' >> return ()) <|> eof <?> "newline or EOF"
+newline = (char '\n' >> return ()) <|> eof <?> "newline or EOF"
 
 {--- Parse some whitespace ---}
 spaces :: Parser ()
