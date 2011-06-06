@@ -1,4 +1,4 @@
-PROGS = parse-test parse-print-test geda-sexpress flatten-hierarchy
+PROGS = parse-test parse-print-test geda-sexpress flatten-hierarchy vhdl-to-sym
 MODULES = Geda/*.hs
 
 all: $(PROGS) 

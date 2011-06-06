@@ -1,0 +1,92 @@
+{-# OPTIONS_GHC -XRecordWildCards #-}
+
+module Main where
+
+import System (getArgs,getProgName)
+import System.Exit (exitSuccess)
+import System.IO
+import Control.Monad (forM_, liftM)
+import Geda.Core
+import Geda.ShowGSchem
+import Language.VHDL.Parser (entityStrings, readEntity)
+import Language.VHDL.Core
+
+-- Dimensional parameters for pins
+len :: Int
+len = 300
+
+spacing :: Int
+spacing = 400
+
+-- Draw a single pin
+dpin whichend x y port = let
+  (ident, dir, typ, val) = port
+  (x1,y1,x2,y2) = case dir of 
+    IN -> (x,y,x+len,y)
+    OUT -> (x+len,y,x,y)
+    INOUT -> (x,y,x,y+len)
+  color = 1
+  pintype = 0
+  atts = []
+  in P {..}
+
+-- Draw several horizontal pins parallel to one another, 
+-- forming a verticle line
+vlpins whichend hoffset voffset vheight ports = 
+  let voffsetp = 
+        voffset + (max 0 $ round $ toRational 
+                   (vheight - length ports * spacing) / 2)
+  in zipWith (dpin whichend hoffset) 
+             [voffsetp + i*spacing | i <- [1..length ports]]
+             ports
+     
+-- Draw several verticle pins parallel to one another, 
+-- forming a horizontal line
+hlpins whichend hoffset voffset hwidth ports = 
+  let hoffsetp = 
+        hoffset + (max 0 $ round $ toRational
+                   (hwidth - length ports * spacing) / 2)
+  in zipWith (\x -> dpin whichend x voffset)
+             [hoffsetp + i*spacing | i <- [1..length ports]]
+             ports
+
+--entity2schematic :: Entity -> [GSchem]
+entity2schematic entity = 
+  [ Version 20110115 2 ] ++
+  (vlpins 0 0 0 vheight inpins) ++
+  (vlpins 0 (hoffset + hwidth)  0 vheight outpins) ++
+  (hlpins 0 hoffset vheight hwidth iopins)
+  where
+    inpins = filter (\(_,dir,_,_) -> dir == IN) $ port entity
+    outpins = filter (\(_,dir,_,_) -> dir == OUT) $ port entity
+    iopins = filter (\(_,dir,_,_) -> dir == INOUT) $ port entity
+    hoffset = len
+    vheight = spacing * max (length inpins) (length outpins)
+    hwidth = spacing * length iopins
+
+-- Process an entity to a schematic in the IO monad
+proc in_fn out_fn = do
+  in_fh <- if (in_fn == "-") then return stdin
+                             else openFile in_fn ReadMode
+  out_fh <- if (out_fn == "-") then return stdout
+                               else openFile out_fn WriteMode 
+  contents <- hGetContents in_fh
+  let ents = map ((\(Right x) -> x) . readEntity) $ 
+                 entityStrings contents
+  hPutStr out_fh $ foldl (++) [] $ map (showGSchem . entity2schematic) ents
+  if (in_fn == "-") then return () 
+                    else hClose in_fh
+  if (out_fn == "-") then return ()
+                     else hClose out_fh
+
+main :: IO ()
+main = do
+  -- Parse command line arguments to determine input/output behavior
+  pn <- getProgName
+  args <- getArgs
+  if (any (=="--help") args) then
+    putStrLn ("Usage: " ++ pn ++ " [INPUT] [OUTPUT]") >> exitSuccess
+    else return ()
+  let in_fn = if (length args >= 1) then (args !! 0) else "-"
+  let out_fn = if (length args >= 2) then (args !! 1) else "-"
+  exitSuccess
