@@ -31,7 +31,7 @@ readGSchem = parse pGSchem "gschem"
 -- This object parses an entry in a GSchem file to a corresponding
 -- object of type GSchem
 pObj :: Parser GSchem
-pObj = pv <|> pL <|> pG <|> pB <|> pV <|> pA <|> try pF <|> pT <|> pN 
+pObj = pv <|> pL <|> pG <|> pB <|> pV <|> pA <|> pT <|> pN 
        <|> pU <|> pP <|> pC <|> pH
 
 {--- Parse a newline or eof ---}
@@ -44,7 +44,7 @@ spaces = many (char ' ') >> return ()
 
 {--- Parse an integer (with trailing whitespace) ---}
 pInt :: Parser Int
-pInt = try negInt <|> try posInt <?> "(signed) integer"
+pInt = negInt <|> posInt <?> "(signed) integer"
   where
     posInt = do { ds <- many1 digit ; spaces ; return $ read ds }
     negInt = do { char '-' ; ds <- many1 digit ; spaces ; return $ - (read ds) }
@@ -83,7 +83,7 @@ p1Att = do
   x1:y1:color:size:visibility:show_name_value:angle:alignment:
     [] <- replicateM 8 pInt
   {- num_lines_ parameter doesn't exist in legacy GSchems -}
-  num_lines <- try pInt <|> return (-1)
+  num_lines <- pInt <|> return (-1)
   {- How many lines we actually read depends on whether we are reading 
      legacy schematics -}
   let actual_num_lines = case num_lines of { (-1) -> 1 ; _ -> num_lines }
@@ -92,6 +92,7 @@ p1Att = do
   char '='
   values <- replicateM actual_num_lines pLine
   let value = intercalate "\n" values
+  let atts = []
   return Att {..}
   where
     pLine = do val <- many (noneOf "\n")
@@ -104,7 +105,7 @@ pv = do
   char 'v'
   spaces
   version <- pInt
-  fileformat_version <- try pInt <|> return (-1)
+  fileformat_version <- pInt <|> return (-1)
   newline
   return Version {..}
 
@@ -116,7 +117,7 @@ pL = do
   x1:y1:x2:y2:color:line_width:capstyle:dashstyle:dashlength:dashspace:
     [] <- replicateM 10 pInt
   newline
-  atts <- try pAtts <|> return []
+  atts <- pAtts <|> return []
   return $ L {..}
 
 -- Parse combinator for a Graphic
@@ -133,7 +134,7 @@ pG = do
               string "\n.\n";
               return enc' }
     else return ""
-  atts <- try pAtts <|> return [] 
+  atts <- pAtts <|> return [] 
   return G {..}
 
 -- Parse combinator for a Box
@@ -145,7 +146,7 @@ pB = do
     dashspace:filltype:fillwidth:angle1:pitch1:angle2:pitch2:
     [] <- replicateM 16 pInt
   newline
-  atts <- try pAtts <|> return [] 
+  atts <- pAtts <|> return [] 
   return B {..}
 
 -- Parse combinator for a Circle
@@ -156,7 +157,7 @@ pV = do
   x1:y1:radius:color:line_width:capstyle:dashstyle:dashlength:dashspace:
     filltype:fillwidth:angle1:pitch1:angle2:pitch2:[] <- replicateM 15 pInt
   newline
-  atts <- try pAtts <|> return [] 
+  atts <- pAtts <|> return [] 
   return $ V {..}
 
 -- Parse combinator for an Arc
@@ -167,10 +168,10 @@ pA = do
   x1:y1:radius:startangle:sweepangle:color:line_width:capstyle:dashstyle:
     dashlength:dashspace:[] <- replicateM 11 pInt
   newline
-  atts <- try pAtts <|> return [] 
+  atts <- pAtts <|> return [] 
   return A {..}
 
-{--- Parse a Text Object ---}
+{--- Parse a Text Object or Attribute ---}
 pT :: Parser GSchem
 pT = do
   char 'T'
@@ -178,12 +179,17 @@ pT = do
   x1:y1:color:size:visibility:show_name_value:angle:alignment:
     [] <- replicateM 8 pInt
   -- Same issue as in attribute parser
-  num_lines <- try pInt <|> return (-1)
+  num_lines <- pInt <|> return (-1)
   let actual_num_lines = case num_lines of { (-1) -> 1 ; _ -> num_lines }
   newline
   text <- replicateM actual_num_lines pToNL
-  atts <- try pAtts <|> return []
-  return T {..}
+  atts <- pAtts <|> return []
+  -- Check if we are a floating attribute or not
+  if not ((any.any) (=='=') text) then return T {..}
+    else let txt = concat text in return 
+         Att { key = takeWhile (/= '=') txt,
+               value = drop 1 $ dropWhile (/= '=') txt,
+               .. }
   where
     {--- Parse a string up to a New Line ---}
     pToNL = do ln <- many (noneOf "\n")
@@ -197,7 +203,7 @@ pN = do
   spaces
   x1:y1:x2:y2:color:[] <- replicateM 5 pInt
   newline
-  atts <- try pAtts <|> return []
+  atts <- pAtts <|> return []
   return N {..}
 
 -- Parse combinator a Bus
@@ -207,7 +213,7 @@ pU = do
   spaces
   x1:y1:x2:y2:color:ripperdir:[] <- replicateM 6 pInt
   newline
-  atts <- try pAtts <|> return []
+  atts <- pAtts <|> return []
   return U {..}
 
 -- Parse combinator for a Pin
@@ -218,10 +224,10 @@ pP = do
   x1:y1:x2:y2:color:[] <- replicateM 5 pInt
   {- Some schematics don't have a pintype, and whichend is calculated on
      the fly sometimes -} 
-  pintype <- try pInt <|> return (-1)
-  whichend <- try pInt <|> return (-1)
+  pintype <- pInt <|> return (-1)
+  whichend <- pInt <|> return (-1)
   newline
-  atts <- try pAtts <|> return []
+  atts <- pAtts <|> return []
   return P {..}
 
 -- Parse combinator for a Component
@@ -232,9 +238,9 @@ pC = do
   x1:y1:selectable:angle:mirror:[] <- replicateM 5 pInt
   basename <- many (noneOf "\n")
   newline
-  emb_comp <- try pEmbComp <|> return []
+  emb_comp <- pEmbComp <|> return []
   let sources = []
-  atts <- try pAtts <|> return []
+  atts <- pAtts <|> return []
   return C {..}
 
 -- Helper parser for an embedded component
@@ -255,13 +261,8 @@ pH = do
     angle1:pitch1:angle2:pitch2:num_lines:[] <- replicateM 13 pInt
   newline
   path <- replicateM num_lines pPath
-  atts <- try pAtts <|> return []
+  atts <- pAtts <|> return []
   return H {..}
-
--- Parse combinator for floating attribute
-pF = do
-  att <- p1Att
-  return $ F att
   
 -- Parse combinator for any Path
 pPath :: Parser Path

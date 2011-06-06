@@ -20,10 +20,6 @@ class GSchemShow a where
 instance GSchemShow [GSchem] where
   showGSchem gs = join $ map showGSchem gs
 
-instance GSchemShow [Att] where
-  showGSchem [] = ""
-  showGSchem atts = "{\n" ++ (join $ map showGSchem atts) ++ "}\n"
-
 {- This helper function pads with spaces and places a newline -}
 sx :: [String] -> String
 sx ss = intercalate " " ss ++ "\n"
@@ -38,23 +34,17 @@ ms = map show
 perhaps :: Int -> [String]
 perhaps i = case i of {(-1) -> []; _ -> [show i]}
 
-instance GSchemShow Att where
-  showGSchem Att {..} = 
-    sx (["T"] ++ ms [x1, y1, color, size, visibility, show_name_value,
-                     angle, alignment] 
-              ++ perhaps num_lines)
-    ++ key ++ "=" ++ value ++ "\n"
-
 instance GSchemShow GSchem where
   showGSchem (Basename _) = ""
-  showGSchem (Pathname _) = ""
+  showGSchem (Dirname _) = ""
   showGSchem Version {..} =
     sx (["v"] ++ ms [version] ++ perhaps fileformat_version)
 
   showGSchem L {..} = 
     sx (["L"] ++ ms [x1, y1, x2, y2, color, line_width, capstyle, dashstyle, 
                      dashlength, dashspace])
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
   
   showGSchem G {..} = 
     sx (["G"] ++ ms [x1, y1, box_width, box_height, angle, ratio, mirrored, 
@@ -62,58 +52,74 @@ instance GSchemShow GSchem where
               ++ filename ++ "\n"
               ++ if (embedded==1) then enc_data ++ "\n.\n"
                                   else ""
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
   showGSchem B {..} = 
     sx (["B"] ++ ms [x1, y1, box_width, box_height, color, line_width, 
                      capstyle, dashstyle, dashlength, dashspace, filltype, 
                      fillwidth, angle1, pitch1, angle2, pitch2])
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
                  
   showGSchem V {..} = 
     sx (["V"]++ ms [x1, y1, radius, color, line_width, capstyle, dashstyle, 
                     dashlength, dashspace, filltype, fillwidth, angle1, pitch1, 
                     angle2, pitch2])
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
   showGSchem A {..} = 
     sx (["A"] ++ ms [x1, y1, radius, startangle, sweepangle, color, line_width, 
                      capstyle, dashstyle, dashlength, dashspace])
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
   
   showGSchem T {..} = 
     sx (["T"] ++ ms [x1, y1, color, size, visibility, show_name_value, angle, 
                      alignment]
               ++ perhaps num_lines)
     ++ join [ ln ++ "\n" | ln <- text]
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
     
   showGSchem N {..} = 
-    sx (["N"] ++ ms [x1, y1, x2, y2, color]) ++ showGSchem atts
+    sx (["N"] ++ ms [x1, y1, x2, y2, color]) ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
   showGSchem U {..} = 
-    sx (["U"] ++ ms [x1, y1, x2, y2, color, ripperdir]) ++ showGSchem atts
+    sx (["U"] ++ ms [x1, y1, x2, y2, color, ripperdir]) ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
   
   showGSchem P {..} = 
     sx (["P"] ++ ms [x1, y1, x2, y2, color]
               ++ perhaps pintype 
               ++ perhaps whichend)
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
   showGSchem C {..} = 
     sx (["C"] ++ ms [x1, y1, selectable, angle, mirror] ++ [basename])
     ++ case emb_comp of { [] -> ""
                         ; _  -> "[\n" ++ showGSchem emb_comp ++ "]\n" }
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" } 
 
   showGSchem H {..} = 
     sx (["H"] ++ ms [color, line_width, capstyle, dashstyle, dashlength, 
                      dashspace, filltype, fillwidth, angle1, pitch1, angle2,
                      pitch2, num_lines])
     ++ showGSchem path
-    ++ showGSchem atts
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
-  showGSchem (F att) = showGSchem att
+  showGSchem Att {..} = 
+    sx (["T"] ++ ms [x1, y1, color, size, visibility, show_name_value,
+                     angle, alignment] 
+              ++ perhaps num_lines)
+    ++ key ++ "=" ++ value ++ "\n"
+    ++ case atts of { [] -> ""
+                    ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
 instance GSchemShow Int where
   showGSchem = show
