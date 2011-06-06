@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -XOverloadedStrings -XRecordWildCards -XFlexibleContexts #-}
-module Parser where
+module Language.VHDL.Parser where
 import Text.Regex.PCRE.Light (match, compile, dotall, 
                               caseless, ungreedy)
 import Text.Parsec.Prim
@@ -8,10 +8,11 @@ import Text.ParserCombinators.Parsec hiding (string)
 import Data.Char (toLower, isSpace)
 import Data.ByteString.Char8 (pack, unpack)
 import System.IO
-import Core
+import Language.VHDL.Core
 
-{-- This module is intended to provide an incomplete VHDL parser, suitable
-    for extracting entity declarations from VHDL files. --}
+{-- This module is intended to provide an incomplete VHDL 
+    parser, suitable for extracting entity declarations 
+    from VHDL files. --}
 
 -- Extracts entity declarations from a string
 entityStrings :: String -> [String]
@@ -21,12 +22,6 @@ entityStrings x = map unpack $
   where
         regex = compile "entity.*end.*;" [dotall,caseless,
                                           ungreedy]
-
--- Gets all of the entity declarations from a file
-hGetEntityStrings :: Handle -> IO [String]
-hGetEntityStrings fh = do
-    contents <- hGetContents fh
-    return $ entityStrings contents
 
 -- Case insensitive version of Parsec's string
 string :: (Stream s m Char) => String -> ParsecT s u m String
@@ -78,7 +73,7 @@ pGenDec = do
     return (ident, dectyp, value)
 
 -- Parses generics for an entity
-pGeneric :: Parser [(ID,Type,Maybe Value)]
+pGeneric :: Parser [Generic]
 pGeneric = do
     string "generic" ; spaces ; char '('
     decs <- pGenDec `sepBy` (spaces >> char ';' >> spaces)
@@ -86,17 +81,17 @@ pGeneric = do
     return decs
 
 -- Parses the direction of a port
-
+pDir :: Parser DIR
 pDir = (string "in" >> return IN) <|>
        (string "out" >> return OUT) <|>
        (string "inout" >> return INOUT)
 
 -- Parses a port declaration
-pPortDec :: Parser (ID, Maybe DIR, Type, Maybe Value)
+pPortDec :: Parser Port
 pPortDec = do
     ident <- idname
     spaces ; char ':' ; spaces
-    dir <- optionMaybe pDir
+    dir <- pDir
     spaces
     dectyp <- typeid
     spaces
@@ -104,7 +99,7 @@ pPortDec = do
     return (ident, dir, dectyp, value)
 
 -- Parses ports for an entity
-pPort :: Parser [(ID, Maybe DIR, Type, Maybe Value)]
+pPort :: Parser [Port]
 pPort = do
     string "port" ; spaces ; char '('
     decs <- pPortDec `sepBy` (spaces >> char ';' >> spaces)
@@ -125,6 +120,3 @@ pEntity = do
 -- Reads a VHDL entity
 readEntity :: String -> Either ParseError Entity
 readEntity = parse pEntity "VHDL entity"
-
-dat = "entity Clk_div_led is\n  generic (max_count : natural := 48000000);\n  port (CLK : in  std_logic;\n        led : out std_logic);\nend Clk_div_led;"
---dat = "entity Clk_div_led is\n  generic (max_count : natural := 48000000);\n  port (CLK : in  std_logic);\nend Clk_div_led;"
