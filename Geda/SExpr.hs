@@ -48,16 +48,9 @@ ms = map show
 perhaps :: Int -> [String]
 perhaps i = case i of {(-1) -> []; _ -> [show i]}
 
-instance SExpr Att where
-  sexpr Att {..} = sx $  ["T"]
-                   ++ ms [x1, y1, color, size, visibility, show_name_value, 
-                          angle, alignment] 
-                   ++ perhaps num_lines
-                   ++ [ql $ ms [key ++ "=" ++ value]]
-
 instance SExpr GSchem where
   sexpr (Basename _) = ""
-  sexpr (Pathname _) = ""
+  sexpr (Dirname _) = ""
   sexpr Version {..} = sx $  ["v"]
                        ++ ms [version]
                        ++ perhaps fileformat_version
@@ -124,7 +117,13 @@ instance SExpr GSchem where
                         angle2, pitch2, num_lines]
                  ++ [sexpr path]
                  ++ [sexpr atts]
-  sexpr (F att) = sexpr att
+  
+  sexpr Att {..} = sx $  ["T"]
+                   ++ ms [x1, y1, color, size, visibility, show_name_value, 
+                          angle, alignment] 
+                   ++ perhaps num_lines
+                   ++ [ql $ ms [key ++ "=" ++ value]]
+                   ++ [sexpr atts]
 
 instance SExpr Int where
   sexpr = show
