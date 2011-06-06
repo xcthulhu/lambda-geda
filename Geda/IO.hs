@@ -4,6 +4,7 @@ module Geda.IO where
 import Control.Exception
 import Control.Monad (liftM2, mapM, forM)
 import Data.List (lines, nubBy)
+import List (find)
 import Geda.Core
 import Geda.Parser (readGSchem)
 import Geda.ShowGSchem (showGSchem)
@@ -14,28 +15,61 @@ import System.IO
 import System.Posix.Files (fileExist)
 import System.Process (readProcess)
 
--- |Open and parse a schematic from a FilePath
-getGSchematic :: FilePath -> IO [GSchem]
-getGSchematic fn = do
-  handel <- openFile fn ReadMode
-  contents <- hGetContents handel
+-- |Open and parse a schematic from a FilePath. 
+-- |Redirects a FilePath of "-" to stdin
+fnGetGSchematic :: FilePath -> IO [GSchem]
+fnGetGSchematic fn = do
+  fh <- if (fn == "-") then return stdin
+                       else openFile fn ReadMode
+  fh <- openFile fn ReadMode
+  contents <- hGetContents fh
   sch <- tryParse fn contents
-  hClose handel
+  if (fn == "-") then return ()
+                 else hClose fh
   return sch
   where
     tryParse fn x = case readGSchem x of
       Left err -> throwIO $ ErrorCall 
                   $ "Parse of " ++ fn ++ " FAILED!\nReason: " ++ show err
-      -- Prepend the Filename for reference purposes
+      -- Prepend the Filename for reference purposes, provided input isn't specified as stdin
       Right sch -> do
-        let (path,base) = splitFileName fn
-        return $ (Basename base):(Pathname path):sch
+        if (fn == "-") 
+          then return sch
+          else do {
+              let (path,base) = splitFileName fn
+            ; return $ (Basename base):(Dirname path):sch }
 
--- |Print a schematic to file
-putGSchematic :: FilePath -> [GSchem] -> IO ()
-putGSchematic fn gschem = do
-  fh <- openFile fn WriteMode
+-- |Get the basename metadata of a schematic
+baseName :: [GSchem] -> String
+baseName gschem = bname
+  where
+    bname = maybe "" (\(Basename s) -> s) $ find base gschem
+    base (Basename _) = True
+    base _ = False
+    
+-- |Get the dirname metadata of a schematic
+dirName :: [GSchem] -> String
+dirName gschem = dname
+  where
+    dname = maybe "" (\(Dirname s) -> s) $ find dir gschem
+    dir (Basename _) = True
+    dir _ = False
+
+-- |Get encoded FilePath metadata from a schematic
+fullPath :: [GSchem] -> FilePath
+fullPath gschem = (dirName gschem) ++ (baseName gschem)
+
+-- |Print a schematic to a FilePath.
+-- |Redirects a FilePath of "-" to stdin
+-- |Redirects a FilePath of "_" to use Dirname/Basename metadata to reconstruct the FilePath 
+fnPutGSchematic :: FilePath -> [GSchem] -> IO ()
+fnPutGSchematic fn gschem = do
+  fh <- case fn of { "-" -> return stdin 
+                   ; "_" -> openFile (fullPath gschem) WriteMode
+                   ; _ -> openFile fn WriteMode }
   hPutStr fh $ showGSchem gschem
+  case fn of { "-" -> return () 
+             ; _ -> hClose fh }
   hClose fh
 
 -- |Returns the component and source libraries loaded by calling gnetlist
@@ -85,7 +119,7 @@ embedComps :: [FilePath] -> GSchem -> IO (GSchem)
 embedComps libs obj@(C {..})
   | emb_comp /= [] = return obj
   | otherwise = 
-    do new_emb_comp <- getGSchematic =<< fullPathLookup basename libs
+    do new_emb_comp <- fnGetGSchematic =<< fullPathLookup basename libs
        return C {emb_comp = new_emb_comp, ..}
   
 embedComps _ obj = return obj
@@ -95,7 +129,7 @@ hCompSources :: [FilePath] -> GSchem -> IO GSchem
 hCompSources libs obj@(C {..}) = do
   let source_basenames = getAllAtts obj "source"
   source_fullnames <- mapM (`fullPathLookup` libs) source_basenames
-  new_sources <- mapM getGSchematic source_fullnames
+  new_sources <- mapM fnGetGSchematic source_fullnames
   return C {sources = new_sources, ..}
     
 hCompSources _ obj = return obj

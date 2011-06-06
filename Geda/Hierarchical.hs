@@ -9,14 +9,6 @@ import System.FilePath ((</>))
 {- This module contains pure functions for manipulating Hierarchical 
    schematics -}
 
--- |Get the basename of a schematic
-baseName :: [GSchem] -> String
-baseName gschem = bname
-  where
-    Just (Basename bname) = find bases gschem
-    bases (Basename _) = True
-    bases _ = False
-
 -- |Gets the all values for a given GSchem object indexed by an attribute 
 -- key
 getAllAtts :: GSchem -> String -> [String]
