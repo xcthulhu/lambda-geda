@@ -1,6 +1,6 @@
 #/bin/bash
 
-for i in SXI/* gschem-bench/* ; do
+for i in SXI/*.sch gschem-bench/*.sym gschem-bench/*.sch ; do
 	d=`../parse-print-test $i | diff $i -`
 	if [ ! $dd ] ; then
 		echo $i PASSED
