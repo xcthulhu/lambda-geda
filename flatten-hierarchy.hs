@@ -13,7 +13,7 @@ main = do
   args <- getArgs
   if ((any (=="--help") args) || args == [])
     then putStrLn ("Usage: " ++ pn ++ 
-                   " [OUTPUTDIRECTORY] [[INPUT1] [INPUT2] [INPUT3]]") 
+                   " [OUTPUTDIRECTORY] [[INPUT1] [INPUT2] [INPUT3] ...]") 
          >> exitSuccess
     else return ()
   let outdir = head args       

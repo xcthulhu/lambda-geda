@@ -60,11 +60,11 @@ fullPath :: [GSchem] -> FilePath
 fullPath gschem = (dirName gschem) ++ (baseName gschem)
 
 -- |Print a schematic to a FilePath.
--- |Redirects a FilePath of "-" to stdin
+-- |Redirects a FilePath of "-" to stdout
 -- |Redirects a FilePath of "_" to use Dirname/Basename metadata to reconstruct the FilePath 
 fnPutGSchematic :: FilePath -> [GSchem] -> IO ()
 fnPutGSchematic fn gschem = do
-  fh <- case fn of { "-" -> return stdin 
+  fh <- case fn of { "-" -> return stdout 
                    ; "_" -> openFile (fullPath gschem) WriteMode
                    ; _ -> openFile fn WriteMode }
   hPutStr fh $ showGSchem gschem
