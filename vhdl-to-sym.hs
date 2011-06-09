@@ -7,7 +7,7 @@ import System.Exit (exitSuccess)
 import System.IO
 import Control.Monad (forM_, liftM)
 import Geda.Core
-import Geda.ShowGSchem
+import Geda.IO
 import Language.VHDL.Parser (entityStrings, readEntity)
 import Language.VHDL.Core
 
@@ -51,8 +51,10 @@ hlpins whichend hoffset voffset hwidth ports =
              ports
 
 --entity2schematic :: Entity -> [GSchem]
-entity2schematic entity = 
-  [ Version 20110115 2 ] ++
+entity2schematic out_dir entity = 
+  [ Basename (identifier entity),
+    Dirname (out_dir),
+    Version 20110115 2 ] ++
   (vlpins 0 0 0 vheight inpins) ++
   (vlpins 0 (hoffset + hwidth)  0 vheight outpins) ++
   (hlpins 0 hoffset vheight hwidth iopins)
@@ -65,28 +67,28 @@ entity2schematic entity =
     hwidth = spacing * length iopins
 
 -- Process an entity to a schematic in the IO monad
-proc in_fn out_fn = do
-  in_fh <- if (in_fn == "-") then return stdin
-                             else openFile in_fn ReadMode
-  out_fh <- if (out_fn == "-") then return stdout
-                               else openFile out_fn WriteMode 
-  contents <- hGetContents in_fh
-  let ents = map ((\(Right x) -> x) . readEntity) $ 
-                 entityStrings contents
-  hPutStr out_fh $ foldl (++) [] $ map (showGSchem . entity2schematic) ents
-  if (in_fn == "-") then return () 
-                    else hClose in_fh
-  if (out_fn == "-") then return ()
-                     else hClose out_fh
+proc out_dir in_fns = do
+  in_fhs <- if (in_fns == ["-"] || in_fns == []) 
+    then return [stdin]
+    else mapM (`openFile` ReadMode) in_fns
+  cnts <- mapM hGetContents in_fhs
+  let ents =  
+             map ((\(Right x) -> x) . readEntity) $ 
+             concat $ map entityStrings cnts
+  --mapM_ (fnPutGSchematic "-") $
+    mapM_ (putStr.show) $
+         map (entity2schematic out_dir) ents
+  if (in_fns == ["-"] || in_fns == []) 
+    then return () 
+    else mapM_ hClose in_fhs
 
 main :: IO ()
 main = do
   -- Parse command line arguments to determine input/output behavior
   pn <- getProgName
   args <- getArgs
-  if (any (=="--help") args) then
-    putStrLn ("Usage: " ++ pn ++ " [INPUT] [OUTPUT]") >> exitSuccess
+  if (any (=="--help") args || args == []) then
+    putStrLn ("Usage: " ++ pn ++ "[OUTPUTDIRECTORY] [[INPUT1] [INPUT2] [INPUT3] ...]") >> exitSuccess
     else return ()
-  let in_fn = if (length args >= 1) then (args !! 0) else "-"
-  let out_fn = if (length args >= 2) then (args !! 1) else "-"
+  proc (head args) (tail args)
   exitSuccess
