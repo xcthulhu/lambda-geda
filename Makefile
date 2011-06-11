@@ -7,5 +7,5 @@ all: $(PROGS)
 	ghc --make $< -o $@
 
 clean:
-	rm -f *.o *.hi *~ Geda/*.o Geda/*.hi Geda/*~ parsec-2.1.0.1/*.o parsec-2.1.0.1/*.hi $(PROGS) 
+	rm -f *.o *.hi *~ Geda/*.o Geda/*.hi Geda/*~ Language/VHDL/*.o Language/VHDL/*.hi Language/VHDL/*~  $(PROGS) 
 	rm -rf tests/SXI/flatten
