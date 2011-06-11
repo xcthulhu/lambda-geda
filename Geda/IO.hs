@@ -2,7 +2,7 @@
 module Geda.IO where
 
 import Control.Exception
-import Control.Monad (liftM2, mapM, forM)
+import Control.Monad (liftM2, mapM, forM, mzero)
 import Data.List (lines, nubBy)
 import List (find)
 import Geda.Core
@@ -33,44 +33,41 @@ fnGetGSchematic fn = do
                   $ "Parse of " ++ fn ++ " FAILED!\nReason: " ++ show err
       -- Prepend the Filename for reference purposes, provided input isn't specified as stdin
       Right sch -> do
-        if (fn == "-") 
-          then return sch
+        if (fn == "-") then return sch
           else do {
               let (path,base) = splitFileName fn
             ; return $ (Basename base):(Dirname path):sch }
 
 -- |Get the basename metadata of a schematic
 baseName :: [GSchem] -> String
-baseName gschem = bname
+baseName gschem = maybe "" (\(Basename s) -> s) $ find base gschem
   where
-    bname = maybe "" (\(Basename s) -> s) $ find base gschem
     base (Basename _) = True
     base _ = False
     
 -- |Get the dirname metadata of a schematic
 dirName :: [GSchem] -> String
-dirName gschem = dname
+dirName gschem = maybe "" (\(Dirname s) -> s) $ find dir gschem
   where
-    dname = maybe "" (\(Dirname s) -> s) $ find dir gschem
-    dir (Basename _) = True
+    dir (Dirname _) = True
     dir _ = False
 
 -- |Get encoded FilePath metadata from a schematic
 fullPath :: [GSchem] -> FilePath
-fullPath gschem = (dirName gschem) ++ (baseName gschem)
+fullPath gschem = (dirName gschem) </> (baseName gschem)
 
 -- |Print a schematic to a FilePath.
 -- |Redirects a FilePath of "-" to stdout
 -- |Redirects a FilePath of "_" to use Dirname/Basename metadata to reconstruct the FilePath 
 fnPutGSchematic :: FilePath -> [GSchem] -> IO ()
 fnPutGSchematic fn gschem = do
-  fh <- case fn of { "-" -> return stdout 
-                   ; "_" -> openFile (fullPath gschem) WriteMode
-                   ; _ -> openFile fn WriteMode }
-  hPutStr fh $ showGSchem gschem
-  case fn of { "-" -> return () 
-             ; _ -> hClose fh }
-  hClose fh
+  let gs = showGSchem gschem
+  if fn == "-" then putStr gs
+    else do { 
+        fh <- case fn of { "_" -> openFile (fullPath gschem) WriteMode
+                         ; _ -> openFile fn WriteMode }
+      ; hPutStr fh gs
+      ; hClose fh }
 
 -- |Returns the component and source libraries loaded by calling gnetlist
 getLibraries :: IO ([FilePath],[FilePath]) 
