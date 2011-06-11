@@ -4,9 +4,11 @@
 \#*
 .#*
 *.swp
+*.sym
 parse-test
 parse-print-test
 geda-sexpress
+vhdl-to-sym
 flatten-hierarchy
 tests/SXI/flatten/*
 tests/SXI/flatten
