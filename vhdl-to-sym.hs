@@ -22,10 +22,19 @@ spacing = 400
 text_size :: Int
 text_size = 10
 
+-- Convert the pin direction for GSchem's pintype
+showDir IN = "in"
+showDir OUT = "out"
+showDir INOUT = "io"
+
+-- Helper function for extractling line heights
+maxLineHeight ln1 ln2 = max (y2 ln1) (y2 ln2)
+
 -- Draw a single pin
 dpin ((x1,y1),(x2,y2)) port = let
   (ident, dir, typ, val) = port
   color = 1
+  -- Arrow prototype for expediency
   arr = L { line_width = 0, capstyle = 0, dashstyle = 0,
             dashlength = -1, dashspace = -1, atts = [], 
             .. }
@@ -47,8 +56,27 @@ dpin ((x1,y1),(x2,y2)) port = let
            y2=round $ toRational (-x1+x2+y1+5*y2)/ 6},
        arr{x1=x2, y1=y2,
            x2=round $ toRational (x1+5*x2-y1+y2) / 6,
-           y2=round $ toRational (x1-x2+y1+5*y2) / 6})      
-  in [P {pintype=0, whichend = 0, atts=[], ..}, arrowp1, arrowp2]
+           y2=round $ toRational (x1-x2+y1+5*y2) / 6})
+  -- Pin attribute prototype
+  att = Att {x1=x2, y1=y2, color=5, size=text_size - 5,
+             visibility=0, show_name_value=0, angle=0,
+             alignment=(if x1 < x2 then 1 else 7),
+             num_lines=1, key="", value="", atts=[]}
+  in [ P {pintype=0, whichend = 0, 
+          atts=[ att{ key="pinnumber", value=ident }
+               , att{ y1=y2+text_size*10,
+                      key="pinseq", value=ident }
+               , att{ y1=y2+2*text_size*10,
+                      key="pintype", value=(showDir dir) }
+               , att{ x1 = round $ 
+                           toRational (x1+5*x2+y1-y2) / 6,
+                      y1 = maxLineHeight arrowp1 arrowp2,
+                      alignment=(if x1 < x2 then 6 else 0),
+                      visibility = 1, show_name_value = 1,
+                      key="pinlabel", value=ident }
+               ], ..}
+     , arrowp1
+     , arrowp2 ]
 
 -- Calculates the offset from input parameters
 offp offset d n = offset + (max 0 $ round $ toRational
@@ -92,22 +120,24 @@ mkbox x y hwidth vheight devname =
              , Z ]
       angle = 0
       atts = [] in
-  [ H { color = 3, line_width = 0, capstyle = 0, 
-        dashstyle = 0, dashlength = -1, dashspace = -1, 
-        filltype = 0, fillwidth = -1, angle1 = -1, 
-        pitch1 = -1, angle2 = -1, pitch2 = -1, 
-        num_lines = length path, .. }
-  , T { x1 = x + width, y1 = y + vheight + 15, color = 8, 
-        visibility = 1, show_name_value = 1, alignment = 6, 
-        num_lines = 1, text = ["refdes=U?"], .. }
-  , T { x1 = x, y1 = y + vheight, color = 5, 
-        visibility = 0, show_name_value = 0, alignment = 0, 
-        num_lines = 1, text = ["device=" ++ devname], .. }
-  , T { x1 = round (toRational (2*x + width) / 2), 
-        y1 = round (toRational (2*y + vheight) / 2), 
-        color = 9, visibility = 1, show_name_value = 0, 
-        alignment = 4, num_lines = 1, 
-        text = [devname], .. } ]
+  [ H   { color = 3, line_width = 0, capstyle = 0, 
+          dashstyle = 0, dashlength = -1, dashspace = -1, 
+          filltype = 0, fillwidth = -1, angle1 = -1, 
+          pitch1 = -1, angle2 = -1, pitch2 = -1, 
+          num_lines = length path, .. }
+  , Att { x1 = x + width, y1 = y + vheight + 20, color = 8, 
+          visibility = 1, show_name_value = 1, 
+          alignment = 6, num_lines = 1, 
+          key="refdes", value="U?", .. }
+  , Att { x1 = x, y1 = y + vheight, color = 5, 
+          visibility = 0, show_name_value = 0, 
+          alignment = 0, num_lines = 1, 
+          key="device", value=devname, .. }
+  , T   { x1 = round (toRational (2*x + width) / 2), 
+          y1 = round (toRational (2*y + vheight) / 2), 
+          color = 9, visibility = 1, show_name_value = 0, 
+          alignment = 4, num_lines = 1, 
+          text = [devname], .. } ]
 
 entity2schematic :: FilePath -> Entity -> [GSchem]
 entity2schematic out_dir entity = 
@@ -123,9 +153,10 @@ entity2schematic out_dir entity =
                                       dir == INOUT) $ port entity
     voffset = len
     hoffset = len
-    vheight = spacing * (1 + max (length inpins) 
-                                 (length outpins))
     hwidth = calcWidth $ identifier entity
+    vheight = max hwidth $ 
+                  spacing * (1 + max (length inpins) 
+                                     (length outpins))
 
 -- Process an entity to a schematic in the IO monad
 proc out_dir in_fns = do
