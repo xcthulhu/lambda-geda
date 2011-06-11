@@ -322,9 +322,10 @@ pCc = do
   newline
   return $ Cc moves
 
--- Parse combinator for a Close-path instruction
+-- Parse combinator for a close-path instruction
 pZ :: Parser Path
 pZ = do
    char 'Z' <|> char 'z'
    spaces
+   newline
    return Z
