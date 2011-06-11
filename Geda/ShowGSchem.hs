@@ -131,13 +131,13 @@ instance GSchemShow a => GSchemShow (a, a, a) where
   showGSchem (x,y,z) = intercalate "," $ map showGSchem [x,y,z]
 
 instance GSchemShow Path where
-  showGSchem (MM args) = sx (["M"] ++ map showGSchem args) ++ "\n"
-  showGSchem (Mm args) = sx (["m"] ++ map showGSchem args) ++ "\n"
-  showGSchem (LL args) = sx (["L"] ++ map showGSchem args) ++ "\n"
-  showGSchem (Ll args) = sx (["l"] ++ map showGSchem args) ++ "\n"
-  showGSchem (CC args) = sx (["C"] ++ map showGSchem args) ++ "\n"
-  showGSchem (Cc args) = sx (["c"] ++ map showGSchem args) ++ "\n"
-  showGSchem Z = "Z\n"
+  showGSchem (MM args) = sx (["M"] ++ map showGSchem args)
+  showGSchem (Mm args) = sx (["m"] ++ map showGSchem args)
+  showGSchem (LL args) = sx (["L"] ++ map showGSchem args)
+  showGSchem (Ll args) = sx (["l"] ++ map showGSchem args)
+  showGSchem (CC args) = sx (["C"] ++ map showGSchem args)
+  showGSchem (Cc args) = sx (["c"] ++ map showGSchem args)
+  showGSchem Z = "z"
 
 instance GSchemShow [Path] where
-  showGSchem path = intercalate "\n" (map showGSchem path) ++ "\n"
+  showGSchem path = join (map showGSchem path) ++ "\n"
