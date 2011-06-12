@@ -83,7 +83,7 @@ typeid = do
 pGenDec :: Parser [(ID,Type,Maybe Value)]
 pGenDec = do
   spaces
-  idents <- idName `sepBy` (spaces >> char ',')
+  idents <- idName `sepBy` (try $ spaces >> char ',')
   spaces ; char ':' ; spaces
   dectyp <- typeid
   spaces
@@ -107,7 +107,7 @@ pDir = spaces >>
               , string "out" >> return OUT ]
 
 -- Parses a port declaration
--- Due to VHDL syntax, sometimes multiple ports are declared
+-- Due to VHDL syntax, sometimes multiple ports are declared together
 pPortDec :: Parser [Port]
 pPortDec = do
   spaces
@@ -115,6 +115,7 @@ pPortDec = do
   spaces ; char ':'
   dir <- pDir
   dectyp <- typeid
+  spaces
   value <- optionMaybe pVal
   return [(i, dir, dectyp, value) | i <- idents]
 
