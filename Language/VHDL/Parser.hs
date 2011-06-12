@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -XOverloadedStrings -XRecordWildCards -XFlexibleContexts #-}
 module Language.VHDL.Parser where
 import Text.Regex.PCRE.Light (match, compile, dotall, 
-                              caseless, ungreedy)
-import Text.Parsec.Prim
+                              caseless, multiline, ungreedy)
+import Text.Parsec.Prim hiding (try)
 import Text.ParserCombinators.Parsec.Pos (updatePosString)
 import Text.ParserCombinators.Parsec hiding (string)
 import Data.Char (toLower, isSpace)
@@ -14,14 +14,19 @@ import Language.VHDL.Core
     parser, suitable for extracting entity declarations 
     from VHDL files. --}
 
--- Extracts entity declarations from a string
+-- Extracts entity declarations from a string, while filtering comments
 entityStrings :: String -> [String]
-entityStrings x = map unpack $
+entityStrings x = map removeComments $
+                  map unpack $
                   maybe [] id $
-                  match regex (pack x) [] 
+                  match entity (pack x) [] 
   where
-        regex = compile "entity.*end.*;" [dotall,caseless,
-                                          ungreedy]
+    entity = compile "entity.*end.*;" [dotall,caseless,ungreedy]
+    -- No regex replace for pcre-light, so roll our own
+    removeComments ('-':'-':rst) = 
+      removeComments $ dropWhile (/= '\n') rst
+    removeComments (c:rst) = c:(removeComments rst)
+    removeComments "" = ""
 
 -- Case insensitive version of Parsec's string
 string :: (Stream s m Char) => String -> ParsecT s u m String
@@ -30,7 +35,9 @@ string s = tokens ((map toLower) . show) updatePosString ((map toLower) s)
 -- Parses nested paren statements
 parenstatement :: Parser String
 parenstatement = do
-  v <- between (char '(') (char ')') (many p)
+  spaces
+  v <- between (char '(') (char ')') 
+               (manyTill p (lookAhead $ char ')'))
   return $ "(" ++ (concat v) ++ ")"
     where
       p = do x <- many (noneOf "()")
@@ -40,82 +47,95 @@ parenstatement = do
 -- Parses an expression, terminated by an unmatched ')' or a ';'
 pExp :: Parser String
 pExp = do
-    start <- many (noneOf "(;)")
-    middle <- parenstatement <|> return []
-    end <- (lookAhead (oneOf ";)") >> return []) <|> pExp
-    return $ start ++ middle ++ end
+  spaces
+  start <- many (noneOf "(;)")
+  spaces
+  middle <- parenstatement <|> return ""
+  end <- (lookAhead (oneOf ";)") >> return "") <|> pExp
+  return $ start ++ middle ++ end
 
 -- Parses a value assignment
 pVal :: Parser Value
 pVal = do
-    string ":=" ; spaces
-    pExp
+  spaces ; string ":=" ; spaces
+  pExp
 
 -- Parse an idname
-idname = many $ satisfy $ (\x -> not ((isSpace x) || (x == ';') || (x == ':')))
+idName = do
+  spaces
+  many $ satisfy $ 
+    \x -> not $ any (\f -> f x) 
+          [ isSpace, (==':'), (==',') ]
 
 -- Parse a type
 typeid = do
-    start <- many $ satisfy $ (\x -> not ((isSpace x) || (x == ';') ||
-                                          (x == '(')  || (x == ')') ||
-                                          (x == ':')))
-    end <- parenstatement <|> return []
-    return $ start ++ end
+  spaces
+  start <- many $ satisfy $ 
+           \x -> not $ any (\f -> f x)
+                 [ isSpace, (==';'), (=='('),
+                   (==')'), (==':') ]
+  spaces
+  end <- parenstatement <|> return ""
+  return $ start ++ end
 
 -- Parses a generic declaration
-pGenDec :: Parser (ID,Type,Maybe Value)
+-- Due to VHDL syntax, sometimes multiple declarations are possible
+pGenDec :: Parser [(ID,Type,Maybe Value)]
 pGenDec = do
-    ident <- idname
-    spaces ; char ':' ; spaces
-    dectyp <- typeid
-    spaces
-    value <- optionMaybe pVal
-    return (ident, dectyp, value)
+  spaces
+  idents <- idName `sepBy` (spaces >> char ',')
+  spaces ; char ':' ; spaces
+  dectyp <- typeid
+  spaces
+  value <- optionMaybe pVal
+  return [(i, dectyp, value) | i <- idents]
 
 -- Parses generics for an entity
 pGeneric :: Parser [Generic]
 pGeneric = do
-    string "generic" ; spaces ; char '('
-    decs <- pGenDec `sepBy` (spaces >> char ';' >> spaces)
-    spaces ; char ')' ; spaces ; char ';'
-    return decs
+  spaces ; string "generic" ; spaces ; char '('
+  decs <- pGenDec `sepBy` (spaces >> char ';')
+  spaces ; char ')' ; spaces ; char ';'
+  return $ concat decs
 
 -- Parses the direction of a port
 pDir :: Parser DIR
-pDir = (string "in" >> return IN) <|>
-       (string "out" >> return OUT) <|>
-       (string "inout" >> return INOUT)
+pDir = spaces >>
+       choice [ string "in" >> 
+                choice [ string "out" >> return INOUT 
+                       , return IN ]
+              , string "out" >> return OUT ]
 
 -- Parses a port declaration
-pPortDec :: Parser Port
+-- Due to VHDL syntax, sometimes multiple ports are declared
+pPortDec :: Parser [Port]
 pPortDec = do
-    ident <- idname
-    spaces ; char ':' ; spaces
-    dir <- pDir
-    spaces
-    dectyp <- typeid
-    spaces
-    value <- optionMaybe pVal
-    return (ident, dir, dectyp, value)
+  spaces
+  idents <- idName `sepBy` (try $ spaces >> char ',')
+  spaces ; char ':'
+  dir <- pDir
+  dectyp <- typeid
+  value <- optionMaybe pVal
+  return [(i, dir, dectyp, value) | i <- idents]
 
 -- Parses ports for an entity
 pPort :: Parser [Port]
 pPort = do
-    string "port" ; spaces ; char '('
-    decs <- pPortDec `sepBy` (spaces >> char ';' >> spaces)
-    spaces ; char ')' ; spaces ; char ';'
-    return decs
+  spaces ; string "port" ; spaces ; char '('
+  decs <- pPortDec `sepBy` (spaces >> char ';')
+  spaces ; char ')' ; spaces ; char ';'
+  return $ concat decs
 
 -- Parses a VHDL entity
 pEntity :: Parser Entity
 pEntity = do
-    string "entity" ; spaces
-    identifier <- idname
-    spaces ; string "is" ; spaces
-    generic <- pGeneric <|> return []
-    spaces
-    port <- pPort <|> return []
-    return Entity {..}
+  string "entity" ; spaces
+  identifier <- idName
+  spaces ; string "is" ; spaces
+  generic <- pGeneric <|> return []
+  spaces
+  port <- pPort <|> return []
+  return Entity {..}
     
 -- Reads a VHDL entity
 readEntity :: String -> Either ParseError Entity
