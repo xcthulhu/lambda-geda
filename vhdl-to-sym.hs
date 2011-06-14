@@ -6,6 +6,8 @@ import System (getArgs,getProgName)
 import System.Exit (exitSuccess)
 import System.IO
 import Control.Monad (forM_, liftM)
+import Char (toLower)
+import Data.List (isInfixOf, sortBy)
 import Geda.Core
 import Geda.IO
 import Language.VHDL.Parser (entityStrings, readEntity)
@@ -30,7 +32,11 @@ showDir INOUT = "io"
 -- Helper function for extractling line heights
 maxLineHeight ln1 ln2 = max (y2 ln1) (y2 ln2)
 
+-- Helper function for determining if something is a clock
+itsAClock (x, _, _, _) = "clk" `isInfixOf` (map toLower x)
+
 -- Draw a single pin
+dpin :: ((Int,Int),(Int,Int)) -> Port -> [GSchem]
 dpin ((x1,y1),(x2,y2)) port = let
   (ident, dir, typ, val) = port
   color = 1
@@ -62,6 +68,23 @@ dpin ((x1,y1),(x2,y2)) port = let
              visibility=0, show_name_value=0, angle=0,
              alignment=(if x1 < x2 then 1 else 7),
              num_lines=1, key="", value="", atts=[]}
+  -- Draw a little clock triangle at (x2,y2) 
+  -- ...if the port is a clock
+  clk = if (not $ (itsAClock port) && (dir == IN)) 
+        then [] 
+        else [ H { color = 3, line_width = 0, capstyle = 0, 
+                   dashstyle = 0, dashlength = -1, 
+                   dashspace = -1, filltype = 0, 
+                   fillwidth = -1, angle1 = -1, 
+                   pitch1 = -1, angle2 = -1, pitch2 = -1, 
+                   num_lines = length path, atts=[], .. } ]
+  path = [ MM [ (x2 + (round $ toRational (x2-x1) / 6),
+                 y2 + (round $ toRational (y2-y1) / 6))]
+         , LL [ (x2 + (round $ toRational (y1-y2) / 6),
+                 y2 + (round $ toRational (x2-x1) / 6)) 
+              , (x2 + (round $ toRational (y2-y1) / 6),
+                 y2 + (round $ toRational (x1-x2) / 6))]
+         , Z ]
   in [ P {pintype=0, whichend = 0, 
           atts=[ att{ key="pinnumber", value=ident }
                , att{ y1=y2+text_size*10,
@@ -76,7 +99,7 @@ dpin ((x1,y1),(x2,y2)) port = let
                       key="pinlabel", value=ident }
                ], ..}
      , arrowp1
-     , arrowp2 ]
+     , arrowp2 ] ++ clk
 
 -- Calculates the offset from input parameters
 offp offset d n = offset + (max 0 $ round $ toRational
@@ -137,22 +160,33 @@ mkbox x y hwidth vheight devname =
           y1 = round (toRational (2*y + vheight) / 2), 
           color = 9, visibility = 1, show_name_value = 0, 
           alignment = 4, num_lines = 1, 
-          text = [devname], .. } ]
+          text = [devname], .. } ] 
 
 entity2schematic :: FilePath -> Entity -> [GSchem]
 entity2schematic out_dir entity = 
   [ Basename (identifier entity ++ ".sym")
   , Dirname out_dir
   , Version 20110115 2 ]
-  ++ mkbox len len hwidth vheight (identifier entity)
-  ++ vlpins 0 0 voffset vheight inpins
+  ++ mkbox hoffset voffset hwidth vheight (identifier entity)
+  ++ vlpins 0 (hoffset - len)    voffset vheight inpins
   ++ vlpins 1 (hoffset + hwidth) voffset vheight outpins
   where
-    inpins = filter (\(_,dir,_,_) -> dir == IN) $ port entity
-    outpins = filter (\(_,dir,_,_) -> dir == OUT || 
-                                      dir == INOUT) $ port entity
+    its_a_clock x _ = if (itsAClock x) then GT else LT 
+    inpins = sortBy its_a_clock $
+             [(ident, dir, typ, val) | 
+              (ident, dir, typ, val) <- port entity, 
+              dir == IN, not ("wb" `isInfixOf` ident) ]
+    outpins = [(ident, dir, typ, val) | 
+              (ident, dir, typ, val) <- port entity, 
+              ("wb" `isInfixOf` ident) ] ++
+              [(ident, dir, typ, val) | 
+               (ident, dir, typ, val) <- port entity, 
+               dir == INOUT, not ("wb" `isInfixOf` ident) ] ++
+              [(ident, dir, typ, val) | 
+               (ident, dir, typ, val) <- port entity, 
+               dir == OUT, not ("wb" `isInfixOf` ident) ]
     voffset = len
-    hoffset = len
+    hoffset = 2*len
     hwidth = calcWidth $ identifier entity
     vheight = max hwidth $ 
                   spacing * (1 + max (length inpins) 
@@ -171,6 +205,24 @@ proc out_dir in_fns = do
   if (in_fns == ["-"] || in_fns == []) 
     then return () 
     else mapM_ hClose in_fhs
+
+-- Debug - DO NOT USE
+proc2 out_dir in_fns = do
+  in_fhs <- if (in_fns == ["-"] || in_fns == []) 
+    then return [stdin]
+    else mapM (`openFile` ReadMode) in_fns
+  cnts <- mapM hGetContents in_fhs
+  mapM_ putStr $ concat $ map entityStrings cnts
+  return $ map readEntity $ concat $ map entityStrings cnts
+  {-
+  let ents = map ((\(Right x) -> x) . readEntity) $ 
+             concat $ map entityStrings cnts
+  mapM_ (fnPutGSchematic "_") $
+         map (entity2schematic out_dir) ents
+  if (in_fns == ["-"] || in_fns == []) 
+    then return () 
+    else mapM_ hClose in_fhs
+  -}
 
 main :: IO ()
 main = do
