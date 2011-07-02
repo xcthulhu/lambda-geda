@@ -8,7 +8,9 @@ module Language.VHDL.Core where
 data Entity =
   Entity { identifier :: ID
          , generic :: [Generic]
-         , port ::  [Port]}
+         , port ::  [Port]
+         , workdir :: Maybe FilePath
+         , architecture :: Maybe Architecture }
   deriving (Show,Eq)
 
 type ID = String
@@ -18,3 +20,11 @@ data DIR = IN | OUT | INOUT
          deriving (Show,Eq)
 type Port = (ID, DIR, Type, Maybe Value)
 type Generic = (ID,Type,Maybe Value)
+type Architecture = String
+
+emptyEntity :: Entity
+emptyEntity =   Entity { identifier = ""
+                       , generic = []
+                       , port = []
+                       , workdir = Nothing
+                       , architecture = Nothing }
