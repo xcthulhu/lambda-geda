@@ -14,34 +14,82 @@ import Language.VHDL.Core
     parser, suitable for extracting entity declarations 
     from VHDL files. --}
 
+{---------------------------------------}
+
+{-- REGEX 
+    In the following section we use regex to do some top 
+    lever parsing, precisely because we are not parsing
+    all of VHDL, which is context sensitive. Since
+    we only care about a tiny fragment this approach is
+    simpler and more efficient. --}
+
+-- A simple procedure that deletes all comments from 
+-- a string containing VHDL code
+removeComments :: String -> String
+removeComments ('-':'-':rst) = 
+  removeComments $ dropWhile (/= '\n') rst
+removeComments (c:rst) = c:(removeComments rst)
+removeComments "" = ""
+
 -- Extracts entity declarations from a string, while filtering comments
 entityStrings :: String -> [String]
-entityStrings x = map removeComments $
-                  map unpack $
-                  maybe [] id $
-                  match entity (pack x) [] 
-  where
-    entity = compile "entity.*end.*;" [dotall,caseless,ungreedy]
-    -- No regex replace for pcre-light, so roll our own
-    removeComments ('-':'-':rst) = 
-      removeComments $ dropWhile (/= '\n') rst
-    removeComments (c:rst) = c:(removeComments rst)
-    removeComments "" = ""
+entityStrings raw = 
+  map removeComments $
+  map unpack $
+  maybe [] id $
+  match entity (pack raw) [] 
+    where
+      entity = compile "entity.*end.*;" [dotall,caseless,ungreedy]
+
+-- Extracts architecture names associated with an entity 
+-- identifier from a string
+entityArchs :: ID -> String -> [Architecture]
+entityArchs ident raw = 
+  map removeComments $
+  map unpack $
+  maybe [] id $
+  match arch (pack raw) [] 
+    where
+      arch = compile 
+             (pack $ 
+              "architecture.*of.* " 
+              ++ ident 
+              ++ " .*end.*;") 
+             [dotall,caseless,ungreedy]
+
+{---------------------------------------}
+
+{-- Parsec 
+    Below is a collection of parse combinators that 
+    reflect extract the relevant data from preprocessed
+    strings extracted by our regular expressions. --}
 
 -- Case insensitive version of Parsec's string
 string :: (Stream s m Char) => String -> ParsecT s u m String
 string s = tokens ((map toLower) . show) updatePosString ((map toLower) s)
 
--- Parses nested paren statements
-parenstatement :: Parser String
-parenstatement = do
+-- Extracts the name of an architecture declaration
+pArchName :: Parser Architecture
+pArchName = do
+  spaces >> string "architecture" >> spaces
+  manyTill anyChar $ 
+    choice [ space >> return ()
+           , eof ]
+
+-- Reads a VHDL entity
+readArchName :: String -> Either ParseError Architecture
+readArchName = parse pArchName "VHDL architecture"
+
+-- Parses nested parenthetical statements
+parenStatement :: Parser String
+parenStatement = do
   spaces
   v <- between (char '(') (char ')') 
                (manyTill p (lookAhead $ char ')'))
   return $ "(" ++ (concat v) ++ ")"
     where
       p = do x <- many (noneOf "()")
-             y <- parenstatement <|> return []
+             y <- parenStatement <|> return []
              return $ x ++ y
 
 -- Parses an expression, terminated by an unmatched ')' or a ';'
@@ -50,7 +98,7 @@ pExp = do
   spaces
   start <- many (noneOf "(;)")
   spaces
-  middle <- parenstatement <|> return ""
+  middle <- parenStatement <|> return ""
   end <- (lookAhead (oneOf ";)") >> return "") <|> pExp
   return $ start ++ middle ++ end
 
@@ -75,7 +123,7 @@ typeid = do
                  [ isSpace, (==';'), (=='('),
                    (==')'), (==':') ]
   spaces
-  end <- parenstatement <|> return ""
+  end <- parenStatement <|> return ""
   return $ start ++ end
 
 -- Parses a generic declaration
@@ -136,8 +184,10 @@ pEntity = do
   generic <- pGeneric <|> return []
   spaces
   port <- pPort <|> return []
-  return Entity {..}
-    
+  return emptyEntity { identifier = identifier
+                     , generic = generic 
+                     , port = port }
+
 -- Reads a VHDL entity
 readEntity :: String -> Either ParseError Entity
 readEntity = parse pEntity "VHDL entity"
