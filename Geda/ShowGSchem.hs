@@ -28,17 +28,18 @@ sx ss = intercalate " " ss ++ "\n"
 ms :: (Show a) => [a] -> [String]
 ms = map show
 
-{- "perhaps i" makes a list containing a string showing an integer value,
-   provided i is a valid (ie, not equal to -1) and otherwise returns the
-   the empty list -}
-perhaps :: Int -> [String]
-perhaps i = case i of {(-1) -> []; _ -> [show i]}
+{- Calculates the number of lines represented by a string -}
+numLines :: String -> Int
+numLines s = 1 + (length $ filter (=='\n') s)
+
+{- A version of "maybe" for integers.  Uses negative values as failure. -}
+intMaybe v f i = if (0 <= i) then (f i) else v
 
 instance GSchemShow GSchem where
   showGSchem (Basename _) = ""
   showGSchem (Dirname _) = ""
   showGSchem Version {..} =
-    sx (["v"] ++ ms [version] ++ perhaps fileformat_version)
+    sx (["v"] ++ ms [version] ++ intMaybe [] (return . show) fileformat_version)
 
   showGSchem L {..} = 
     sx (["L"] ++ ms [x1, y1, x2, y2, color, line_width, capstyle, dashstyle, 
@@ -77,8 +78,7 @@ instance GSchemShow GSchem where
   
   showGSchem T {..} = 
     sx (["T"] ++ ms [x1, y1, color, size, visibility, show_name_value, angle, 
-                     alignment]
-              ++ perhaps num_lines)
+                     alignment, foldl (+) 0 (map numLines text)])
     ++ join [ ln ++ "\n" | ln <- text]
     ++ case atts of { [] -> ""
                     ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
@@ -93,8 +93,8 @@ instance GSchemShow GSchem where
   
   showGSchem P {..} = 
     sx (["P"] ++ ms [x1, y1, x2, y2, color]
-              ++ perhaps pintype 
-              ++ perhaps whichend)
+              ++ intMaybe [] (return . show) pintype 
+              ++ intMaybe [] (return . show) whichend)
     ++ case atts of { [] -> ""
                     ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
@@ -108,15 +108,14 @@ instance GSchemShow GSchem where
   showGSchem H {..} = 
     sx (["H"] ++ ms [color, line_width, capstyle, dashstyle, dashlength, 
                      dashspace, filltype, fillwidth, angle1, pitch1, angle2,
-                     pitch2, num_lines])
+                     pitch2, length path])
     ++ showGSchem path
     ++ case atts of { [] -> ""
                     ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
 
   showGSchem Att {..} = 
     sx (["T"] ++ ms [x1, y1, color, size, visibility, show_name_value,
-                     angle, alignment] 
-              ++ perhaps num_lines)
+                     angle, alignment, numLines key + numLines value - 1])
     ++ key ++ "=" ++ value ++ "\n"
     ++ case atts of { [] -> ""
                     ; _  -> "{\n" ++ showGSchem atts ++ "}\n" }
