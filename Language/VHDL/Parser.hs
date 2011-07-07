@@ -1,7 +1,5 @@
 {-# OPTIONS_GHC -XOverloadedStrings -XRecordWildCards -XFlexibleContexts #-}
 module Language.VHDL.Parser where
-import Text.Regex.PCRE.Light (match, compile, dotall, 
-                              caseless, multiline, ungreedy)
 import Text.Parsec.Prim hiding (try)
 import Text.ParserCombinators.Parsec.Pos (updatePosString)
 import Text.ParserCombinators.Parsec hiding (string)
@@ -14,52 +12,18 @@ import Language.VHDL.Core
     parser, suitable for extracting entity declarations 
     from VHDL files. --}
 
-{---------------------------------------}
-
-{-- REGEX 
-    In the following section we use regex to do some top 
-    lever parsing, precisely because we are not parsing
-    all of VHDL, which is context sensitive. Since
-    we only care about a tiny fragment this approach is
-    simpler and more efficient. --}
-
 -- A simple procedure that deletes all comments from 
 -- a string containing VHDL code
+-- (huray for tail recursion)
 removeComments :: String -> String
 removeComments ('-':'-':rst) = 
   removeComments $ dropWhile (/= '\n') rst
 removeComments (c:rst) = c:(removeComments rst)
 removeComments "" = ""
 
--- Extracts entity declarations from a string, while filtering comments
-entityStrings :: String -> [String]
-entityStrings raw = 
-  map removeComments $
-  map unpack $
-  maybe [] id $
-  match entity (pack raw) [] 
-    where
-      entity = compile "entity.*end.*;" [dotall,caseless,ungreedy]
-
--- Extracts architecture names associated with an entity 
--- identifier from a string
-entityArchs :: ID -> String -> [Architecture]
-entityArchs ident raw = 
-  map removeComments $
-  map unpack $
-  maybe [] id $
-  match arch (pack raw) [] 
-    where
-      arch = compile 
-             (pack $ 
-              "architecture.*of.* " 
-              ++ ident 
-              ++ " .*end.*;") 
-             [dotall,caseless,ungreedy]
-
 {---------------------------------------}
+{-- Parsec
 
-{-- Parsec 
     Below is a collection of parse combinators that 
     reflect extract the relevant data from preprocessed
     strings extracted by our regular expressions. --}
@@ -68,17 +32,62 @@ entityArchs ident raw =
 string :: (Stream s m Char) => String -> ParsecT s u m String
 string s = tokens ((map toLower) . show) updatePosString ((map toLower) s)
 
--- Extracts the name of an architecture declaration
-pArchName :: Parser Architecture
-pArchName = do
-  spaces >> string "architecture" >> spaces
-  manyTill anyChar $ 
-    choice [ space >> return ()
-           , eof ]
+-- Tries to run a parser repeatedly until input is exhausted
+parseAll :: Parser p -> Parser [p]
+parseAll p = do
+  manyTill (noneOf "") (eof <|> ((lookAhead $ try p) >> return ()))
+  x <- optionMaybe (try p)
+  case x of 
+    Nothing -> return []
+    Just a -> fmap (a :) $ parseAll p
 
--- Reads a VHDL entity
-readArchName :: String -> Either ParseError Architecture
-readArchName = parse pArchName "VHDL architecture"
+-- Extracts a list of library inclusions
+pLibs :: Parser [String]
+pLibs = do
+  string "library" >> spaces
+  many (noneOf ",;") `sepBy` (try $ spaces >> char ',' >> spaces)
+
+-- Reads VHDL library inclusions
+readLibs :: String -> Either ParseError [String]
+readLibs = (parse (fmap concat $ parseAll pLibs) 
+                  "VHDL library inclusion") 
+           . removeComments
+           . (map toLower)
+
+-- Extracts a list from a use directive
+pUse :: Parser [String]
+pUse = do
+  string "use" >> spaces
+  many (noneOf ",;") `sepBy` (try $ spaces >> char ',' >> spaces)
+
+-- Reads VHDL use directives
+readUses :: String -> Either ParseError [String]
+readUses = (parse (fmap concat $ parseAll pUse) 
+                  "VHDL use directive") 
+           . removeComments
+           . (map toLower)
+
+-- Extracts the name of an architecture declaration
+pArch :: String -> Parser Architecture
+pArch entityID = do
+  spaces >> string "architecture" >> spaces
+  arc <- manyTill anyChar $ 
+         choice [ space >> return (), eof ]
+  spaces >> string "of" >> spaces
+  string entityID
+  return arc
+
+-- Reads VHDL use directives
+readArchs :: String -> String -> Either ParseError [Architecture]
+readArchs entityID = (parse (parseAll $ pArch entityID) 
+                            "VHDL architecture") 
+                     . removeComments
+                     . (map toLower)
+
+-- Reads VHDL architectures
+--readArchs :: String -> Either ParseError Architecture
+--readArchs entityID = parse pArch
+--                     "VHDL architecture"
 
 -- Parses nested parenthetical statements
 parenStatement :: Parser String
@@ -131,7 +140,7 @@ typeid = do
 pGenDec :: Parser [(ID,Type,Maybe Value)]
 pGenDec = do
   spaces
-  idents <- idName `sepBy` (try $ spaces >> char ',')
+  idents <- idName `sepBy` (try $ spaces >> char ',' >> spaces)
   spaces ; char ':' ; spaces
   dectyp <- typeid
   spaces
@@ -167,7 +176,7 @@ pPortDec = do
   value <- optionMaybe pVal
   return [(i, dir, dectyp, value) | i <- idents]
 
--- Parses ports for an entity
+-- Parses ports for an entities
 pPort :: Parser [Port]
 pPort = do
   spaces ; string "port" ; spaces ; char '('
@@ -175,7 +184,7 @@ pPort = do
   spaces ; char ')' ; spaces ; char ';'
   return $ concat decs
 
--- Parses a VHDL entity
+-- Parses a VHDL entities
 pEntity :: Parser Entity
 pEntity = do
   string "entity" ; spaces
@@ -188,6 +197,9 @@ pEntity = do
                      , generic = generic 
                      , port = port }
 
--- Reads a VHDL entity
-readEntity :: String -> Either ParseError Entity
-readEntity = parse pEntity "VHDL entity"
+-- Reads VHDL entities
+readEntities :: String -> Either ParseError [Entity]
+readEntities = (parse (parseAll pEntity) 
+                      "VHDL entity") 
+               . removeComments 
+               . (map toLower)
