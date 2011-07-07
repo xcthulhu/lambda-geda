@@ -5,15 +5,19 @@ module Main where
 import System (getArgs,getProgName)
 import System.Exit (exitSuccess)
 import System.IO
-import Control.Monad (forM_, liftM)
+import Control.Monad (join, forM_, liftM)
 import Char (toLower)
-import Data.List (isInfixOf, isPrefixOf, sortBy, find)
+import Data.List ( isInfixOf, 
+                   isPrefixOf,
+                   sortBy,
+                   intercalate,
+                   find )
 import Geda.Core
 import Geda.IO
-import Language.VHDL.Parser ( entityStrings, 
-                              entityArchs, 
-                              readArchName,
-                              readEntity )
+import Language.VHDL.Parser ( readArchs,
+                              readEntities, 
+                              readLibs,
+                              readUses )
 import Language.VHDL.Core
 
 -- Dimensional parameters for pins
@@ -128,7 +132,7 @@ vlpins whichend hoffset voffset vheight ports =
       coords = do i <- [1..length ports]
                   let y = voffsetp + i*spacing
                   return ((x1,y),(x2,y))
-  in concat $ zipWith (uncurry dpin) coords ports
+  in join $ zipWith (uncurry dpin) coords ports
      
 -- Draw several verticle pins parallel to one another, 
 -- forming a horizontal line
@@ -140,7 +144,7 @@ hlpins whichend hoffset voffset hwidth ports =
       coords = do i <- [1..length ports]
                   let x = hoffsetp + i*spacing
                   return ((x,y1),(x,y2))
-  in concat $ zipWith (uncurry dpin) coords ports
+  in join $ zipWith (uncurry dpin) coords ports
 
 -- Calculates the width from an input string
 calcWidth s = (length s) * 10 * text_size + len + (length "U?") * 10 * text_size
@@ -162,12 +166,29 @@ mkbox x y hwidth vheight entity =
               y1 = round (toRational (2*y + vheight) / 2), 
               color = 9, visibility = 1, show_name_value = 0, 
               alignment = 4, num_lines=1,
-              text = [devname], .. }
-   ]
+              text = [devname], .. } ]
    ++ case (architecture entity) of
-     Nothing -> []
-     Just a -> [ invatt { x1 = x + width + 2*len, y1 = 0, 
-                          key="architecture", value=a } ]
+       Nothing -> []
+       Just a -> [ invatt { x1 = x + width + 2*len, y1 = 0, 
+                            key="architecture", value=a } ]
+   ++ case (workdir entity) of
+       Nothing -> []
+       Just work -> [ invatt { x1 = x + width + 2*len, 
+                               y1 = len, 
+                               key="workdir", 
+                               value=work } ]
+   ++ case (libraries entity) of
+       [] -> []
+       libs -> [ invatt { x1 = x + width + 2*len, 
+                          y1 = 2*len, 
+                          key="libraries", 
+                          value=intercalate " " libs } ]
+   ++ case (uses entity) of
+       [] -> []
+       us -> [ invatt { x1 = x + width + 2*len, 
+                        y1 = 3*len, 
+                        key="uses", 
+                        value=intercalate " " us } ]
    ++ write_gens (generic entity)
      where
        devname = (identifier entity)
@@ -187,10 +208,10 @@ mkbox x y hwidth vheight entity =
        visatt = invatt { visibility = 1 }
        write_gens gens = zipWith 
                          (\(ident,typ,val) n -> 
-                           visatt { x1 = x + width + 2*len, y1 = n*len, 
+                           visatt { x1 = x, y1 = y + n*len, 
                                     key = filter (/='\n') $ ident ++ " : " ++ typ,
                                     value = filter (/='\n') $ "?" ++ maybe "" id val })
-                         gens [1..(length gens)]
+                         gens [0..(length gens)-1]
 
 entity2schematic :: FilePath -> Entity -> [GSchem]
 entity2schematic out_dir entity = 
@@ -228,54 +249,58 @@ entity2schematic out_dir entity =
                   spacing * (1 + max (length inpins) 
                                      (length outpins))
 
--- The (partial) inverse of the right canonical injection into
--- the coproduct type
-right (Right x) = x
+-- Converts parsec error coproduct type to Maybe monad
+toMaybe (Left _) = Nothing
+toMaybe (Right a) = Just a
 
--- Filters the image of the left canonical injection into the
--- the coproduct type
-notLeft (Left _) = False
-notLeft (Right _) = True
-    
+-- Similar to sequence for Maybe, only throws away failures
+cleanSequence = sequence . (filter success)
+  where
+    success (Just _) = True
+    success Nothing = False
+
+-- A clean mapM for Maybe
+cleanMapM f ls = cleanSequence $ map f ls
+
+-- Unjustly exits the Maybe monad
+unJust (Just a) = a
+
+-- Probably should make use of Maybe monad transformer
+maybeMkEnts workdir vhdlcode = do 
+  e <- (unJust . toMaybe . readEntities) vhdlcode
+  return $ do { libraries <- (toMaybe . readLibs) vhdlcode
+              ; uses <- (toMaybe . readUses) vhdlcode
+              ; return e { workdir = workdir,
+                           libraries = libraries,
+                           uses = uses } }
+
+-- Given an assortment of file contents, this
+-- creates all of the entities described
+mkAllEnts workdir cnts = do
+  let ents = join $ unJust $ cleanMapM (cleanSequence . 
+                                        (maybeMkEnts 
+                                         workdir))
+                                       cnts
+  e <- ents
+  let idt = identifier e
+  let archs = (unJust . toMaybe . (readArchs idt)) (join cnts)
+  fulle <- if (archs /= [])
+           then [ e { architecture = Just a } | a <- archs ]
+           else [ e ]
+  return fulle
+
 -- Process an entity to a schematic in the IO monad
 proc out_dir in_fns workdir = do
   in_fhs <- if (in_fns == ["-"] || in_fns == []) 
     then return [stdin]
     else mapM (`openFile` ReadMode) in_fns
   cnts <- mapM hGetContents in_fhs
-  let raw_ents = map (setworkdir . right) 
-                 $ filter notLeft $ map readEntity $ 
-                 concat $ map entityStrings cnts
-  let ents = [ e { architecture = Just a } | 
-               e <- raw_ents,
-               a <- map (right . readArchName)
-                    $ concat 
-                    $ map (entityArchs (identifier e)) cnts
-             ]
+  let ents = mkAllEnts workdir cnts
   mapM_ (fnPutGSchematic "_") $
          map (entity2schematic out_dir) ents
-  if (in_fns == ["-"] || in_fns == []) 
+  if (in_fns == ["-"] || in_fns == [])
     then return () 
     else mapM_ hClose in_fhs
-  where
-    setworkdir e = e {workdir = workdir}
-
-proc2 out_dir in_fns workdir = do
-  in_fhs <- if (in_fns == ["-"] || in_fns == []) 
-    then return [stdin]
-    else mapM (`openFile` ReadMode) in_fns
-  cnts <- mapM hGetContents in_fhs
-  let raw_ents = map (setworkdir . right . readEntity) 
-                 $ concat $ map entityStrings cnts
-  let ents = [ show (identifier e,a) | 
-               e <- raw_ents,
-               a <- map (right . readArchName)
-                    $ concat 
-                    $ map (entityArchs (identifier e)) cnts
-             ]
-  mapM_ putStr ents
-  where
-        setworkdir e = e {workdir = workdir}
 
 main :: IO ()
 main = do
