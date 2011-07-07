@@ -9,8 +9,10 @@ data Entity =
   Entity { identifier :: ID
          , generic :: [Generic]
          , port ::  [Port]
+         , architecture :: Maybe Architecture 
          , workdir :: Maybe FilePath
-         , architecture :: Maybe Architecture }
+         , libraries :: [String]
+         , uses :: [String] }
   deriving (Show,Eq)
 
 type ID = String
@@ -27,4 +29,6 @@ emptyEntity =   Entity { identifier = ""
                        , generic = []
                        , port = []
                        , workdir = Nothing
-                       , architecture = Nothing }
+                       , architecture = Nothing 
+                       , libraries = []
+                       , uses = [] }
